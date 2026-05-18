@@ -43,7 +43,7 @@ services:
 
   wintercms:
     build: ./platform
-    container_name: lovemuseum-platform
+    container_name: livemuseum-platform
     restart: unless-stopped
     ports:
       - "8091:80"

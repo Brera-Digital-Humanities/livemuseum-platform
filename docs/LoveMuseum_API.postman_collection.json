@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "LoveMuseum API v1",
-    "_postman_id": "b3b1c1b5-7b17-4ec3-b0ea-lovemuseum-api",
-    "description": "Postman collection for LoveMuseum /api/v1 endpoints: users, POIs, pictures, comments, profiles and bookmarks. Some endpoints are mock routes used by the mobile app while data models are being implemented.",
+    "name": "LiveMuseum API v1",
+    "_postman_id": "b3b1c1b5-7b17-4ec3-b0ea-livemuseum-api",
+    "description": "Postman collection for LiveMuseum /api/v1 endpoints: users, POIs, pictures, comments, profiles and bookmarks. Some endpoints are mock routes used by the mobile app while data models are being implemented.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [

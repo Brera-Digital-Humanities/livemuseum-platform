@@ -41,7 +41,7 @@ return [
         'mysql' => [
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
-            'database' => env('DB_DATABASE', 'lovemuseum_dev'),
+            'database' => env('DB_DATABASE', 'livemuseum_dev'),
             'driver' => 'mysql',
             'engine' => 'InnoDB',
             'host' => env('DB_HOST', 'dblm'),
