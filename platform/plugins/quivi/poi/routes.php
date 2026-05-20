@@ -322,12 +322,73 @@ function lmMockPois()
         ],
     ];
 
+    $basePois = $pois;
+
+    for ($index = count($pois) + 1; $index <= 100; $index++) {
+        $source = $basePois[($index - 1) % count($basePois)];
+        $id = 100 + $index;
+        $suffix = str_pad((string) $index, 3, '0', STR_PAD_LEFT);
+
+        $source['id'] = $id;
+        $source['id_opendata'] = 'LM.' . $id;
+        $source['code'] = $source['code'] . '-mock-' . $suffix;
+        $source['slug'] = $source['slug'] . '-mock-' . $suffix;
+        $source['title'] = $source['title'] . ' Mock ' . $suffix;
+        $source['fulladdress'] = 'Via Mock ' . $index . ' - Milano';
+        $source['address'] = 'Via Mock ' . $index;
+        $source['zipcode'] = '20' . str_pad((string) (100 + $index), 3, '0', STR_PAD_LEFT);
+        $source['lat'] = round($source['lat'] + (($index % 20) - 10) * 0.001, 6);
+        $source['lng'] = round($source['lng'] + (($index % 16) - 8) * 0.001, 6);
+        $source['distance'] = 200 + ($index * 37);
+        $source['descr'] = 'POI mock numero ' . $suffix . ' con dati correlati fittizi per sviluppo e test.';
+        $source['image_url'] = 'https://picsum.photos/seed/lm-poi-' . $id . '/1200/900';
+        $source['num_pictures'] = 20 + $index;
+        $source['num_likes'] = 100 + ($index * 9);
+        $source['num_bookmarks'] = 10 + ($index * 3);
+        $source['num_comments'] = 5 + ($index * 2);
+        $source['tickets_info'] = 'Informazioni biglietti mock per POI ' . $suffix . '.';
+        $source['booking_info'] = 'Prenotazione mock disponibile per POI ' . $suffix . '.';
+
+        $pois[] = $source;
+    }
+
     $pictures = lmMockPictures();
 
     return array_map(function ($poi) use ($pictures) {
         $poiPictures = array_values(array_filter($pictures, function ($picture) use ($poi) {
             return (int) $picture['poi_id'] === (int) $poi['id'];
         }));
+
+        if (empty($poiPictures)) {
+            $poiPictures = [
+                [
+                    'id' => ((int) $poi['id'] * 10) + 1,
+                    'poi_id' => (int) $poi['id'],
+                    'user' => lmMockUser(((int) $poi['id'] % 4) + 1),
+                    'picture' => 'https://picsum.photos/seed/lm-poi-' . $poi['id'] . '-picture-1/1200/900',
+                    'created_at' => '2026-05-' . str_pad((string) (((int) $poi['id'] % 20) + 1), 2, '0', STR_PAD_LEFT) . 'T10:00:00+02:00',
+                    'likes_num' => 20 + ((int) $poi['id'] % 80),
+                    'bookmarks_num' => 5 + ((int) $poi['id'] % 30),
+                    'comments_num' => 2 + ((int) $poi['id'] % 12),
+                    'likes' => ['users' => [lmMockUser(1), lmMockUser(2)]],
+                    'comments' => ['comments' => lmMockComments()],
+                    'bookmarks' => ['users' => [lmMockUser(3)]],
+                ],
+                [
+                    'id' => ((int) $poi['id'] * 10) + 2,
+                    'poi_id' => (int) $poi['id'],
+                    'user' => lmMockUser((((int) $poi['id'] + 1) % 4) + 1),
+                    'picture' => 'https://picsum.photos/seed/lm-poi-' . $poi['id'] . '-picture-2/1200/900',
+                    'created_at' => '2026-05-' . str_pad((string) (((int) $poi['id'] % 20) + 1), 2, '0', STR_PAD_LEFT) . 'T16:30:00+02:00',
+                    'likes_num' => 12 + ((int) $poi['id'] % 60),
+                    'bookmarks_num' => 3 + ((int) $poi['id'] % 20),
+                    'comments_num' => 1 + ((int) $poi['id'] % 8),
+                    'likes' => ['users' => [lmMockUser(2), lmMockUser(4)]],
+                    'comments' => ['comments' => lmMockComments()],
+                    'bookmarks' => ['users' => [lmMockUser(1), lmMockUser(4)]],
+                ],
+            ];
+        }
 
         $poi['last_picture'] = $poiPictures[0] ?? null;
         $poi['pictures'] = $poiPictures;
@@ -384,7 +445,44 @@ function lmMockCurrentUserId(Request $request)
     return $user ? (int) $user->id : (int) $request->input('user_id', 1);
 }
 
+function lmPoiApiKeyError(Request $request)
+{
+    $configuredApiKey = (string) env('POIS_API_KEY');
+
+    if ($configuredApiKey === '') {
+        return Response::json(['error' => 'POIS_API_KEY is not configured.'], 500);
+    }
+
+    $providedApiKey = $request->headers->get('X-API-KEY') ?: $request->input('api_key');
+
+    if (!$providedApiKey) {
+        return Response::json(['error' => 'API key missing.'], 401);
+    }
+
+    if (!hash_equals($configuredApiKey, (string) $providedApiKey)) {
+        return Response::json(['error' => 'Invalid API key.'], 403);
+    }
+
+    return null;
+}
+
 Route::group(['prefix' => 'api/v1/pois'], function () {
+    Route::get('all', function (Request $request) {
+        if ($error = lmPoiApiKeyError($request)) {
+            return $error;
+        }
+
+        $pois = lmMockPois();
+
+        return Response::json([
+            'data' => $pois,
+            'meta' => [
+                'total' => count($pois),
+                'paginated' => false,
+            ],
+        ]);
+    });
+
     Route::get('list', function (Request $request) {
         $validator = Validator::make($request->all(), [
             'lat' => 'required|numeric',
