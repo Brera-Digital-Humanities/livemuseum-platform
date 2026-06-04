@@ -1,2 +1,23 @@
 1.0.1:
-    - Initialize plugin.
+    - 'Initialize plugin.'
+1.0.2:
+    - 'Created table quivi_poi_pois'
+    - builder_table_create_quivi_poi_pois.php
+1.0.3:
+    - 'Add POI import fields and sources table'
+    - poi_import_schema.php
+1.0.4:
+    - 'Widen POI image URL field'
+    - poi_widen_image_url.php
+1.0.5:
+    - 'Add POI scheda type'
+    - poi_add_scheda_type.php
+1.0.6:
+    - 'Add POI picture upload fields'
+    - picture_upload_schema.php
+1.0.7:
+    - 'Link POI pictures to Winter system files'
+    - picture_system_file_id.php
+1.0.8:
+    - 'Add POI engagement write tables'
+    - engagement_schema.php

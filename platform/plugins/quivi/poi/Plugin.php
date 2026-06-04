@@ -11,4 +11,9 @@ class Plugin extends PluginBase
     public function registerSettings()
     {
     }
+
+    public function register()
+    {
+        $this->registerConsoleCommand('Quivi.Poi:Sync', 'Quivi\Poi\Console\Sync');
+    }
 }

@@ -189,8 +189,10 @@
             <p class="lead">Documentazione degli endpoint per app mobile LiveMuseum: autenticazione utenti, point of interest, foto, commenti, profili social e bookmark.</p>
             <div class="meta">
                 <span class="pill">Base URL locale: <code>http://localhost:8091</code></span>
+                <span class="pill">Base URL staging: <code>https://platform.staging.livemuseum.it</code></span>
                 <span class="pill">Prefix: <code>/api/v1</code></span>
                 <span class="pill">Auth: <code>Authorization: Bearer &lt;token&gt;</code></span>
+                <span class="pill">POI API key: <code>X-API-KEY: &lt;key&gt;</code></span>
             </div>
         </main>
     </header>
@@ -363,35 +365,37 @@
 
         <section>
             <h2>Point Of Interest</h2>
-            <p>Rotte mock per lo sviluppo dell'app. I bookmark sostituiscono il concetto precedente di saved. Ogni POI mantiene lo stile del servizio <code>/api/culturalSites</code> con <code>id_opendata</code>, <code>type</code>, <code>title</code>, indirizzo, coordinate <code>lat</code>/<code>lng</code>, <code>image_url</code> e <code>services</code>. Restano disponibili anche i campi social extra dell'app. Ogni POI contiene <code>id</code> e <code>slug</code>; il dettaglio accetta entrambi.</p>
+            <p>Rotte POI basate sui dati reali importati in <code>quivi_poi_pois</code>. I bookmark sostituiscono il concetto precedente di saved. Ogni POI mantiene lo stile del servizio <code>/api/culturalSites</code> con <code>id_opendata</code>, <code>type</code>, <code>title</code>, indirizzo, coordinate <code>lat</code>/<code>lng</code>, <code>image_url</code>, <code>services</code> e <code>schedaType</code>. <code>schedaType</code> e un enum: <code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>. Per i dati non ancora modellati, come social, immagini utente e alcuni dettagli di apertura, restano fallback provvisori. Ogni POI contiene <code>id</code> e <code>slug</code>; il dettaglio accetta entrambi.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/list?lat=45.4642&amp;lng=9.1900</span></h3>
-            <p>Restituisce 5 musei/monumenti di Milano vicini alle coordinate inviate.</p>
+            <p>Restituisce POI reali vicini alle coordinate inviate, ordinati per distanza. Il default e 100 risultati; <code>limit</code> accetta valori da 1 a 500.</p>
             <pre><code>{
   "data": [{
-    "id": 101,
-    "id_opendata": "LM.101",
-    "code": "duomo-milano",
-    "slug": "duomo-milano",
-    "type": "Monumento",
-    "title": "Duomo di Milano",
-    "fulladdress": "Piazza del Duomo - Milano",
-    "address": "Piazza del Duomo",
+    "id": 47954,
+    "id_opendata": "https://www.beweb.chiesacattolica.it/edificidiculto/edificio/15692/",
+    "code": "15692",
+    "slug": "cappella-di-santa-teresa-del-bambino-gesu",
+    "type": "cappella",
+    "category_app": "Chiesa",
+    "schedaType": "base",
+    "title": "Cappella di Santa Teresa del Bambino Gesu",
+    "fulladdress": "Via M.A.Colonna 30 - Milano - Milano - Lombardia",
+    "address": "Via M.A.Colonna 30",
     "region": "Lombardia",
     "province": "Milano",
     "city": "Milano",
-    "zipcode": "20122",
-    "lat": 45.464211,
-    "lng": 9.191383,
-    "distance": 120,
-    "category": {"id": 1, "name_en": "Monument", "name_it": "Monumento"},
-    "descr": "Cattedrale gotica nel centro di Milano, simbolo della citta.",
-    "image_url": "https://picsum.photos/seed/lm-duomo/1200/900",
-    "services": ["Bookshop", "Audioguide", "Visite guidate", "Accesso terrazze"],
-    "num_pictures": 328,
-    "num_likes": 1420,
-    "num_bookmarks": 284,
-    "num_comments": 96,
+    "zipcode": null,
+    "lat": 45.464194,
+    "lng": 9.189635,
+    "distance": 28,
+    "category": {"id": 5, "name_en": "Church", "name_it": "Chiesa"},
+    "descr": "",
+    "image_url": "https://www.beweb.chiesacattolica.it/VisualizzaImmagine.do?prog=0&amp;sercd=15692&amp;dioc=400&amp;tipo=M5&amp;contesto=chiese&amp;statoinv=",
+    "services": ["Accesso libero", "Visite guidate"],
+    "num_pictures": 19,
+    "num_likes": 1678,
+    "num_bookmarks": 28,
+    "num_comments": 60,
     "last_picture": {},
     "likes": {"users": []},
     "comments": {"comments": []},
@@ -399,29 +403,54 @@
   }]
 }</code></pre>
 
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/all</span></h3>
+            <p>Restituisce tutti i POI reali non paginati con risposta JSON in streaming. Richiede API key in header <code>X-API-KEY</code> oppure parametro <code>api_key</code>. La chiave lato server e configurata con <code>POIS_API_KEY</code>.</p>
+            <pre><code>curl http://localhost:8091/api/v1/pois/all \
+  -H "Accept: application/json" \
+  -H "X-API-KEY: livemuseum-pois-dev-key"</code></pre>
+            <pre><code>{
+  "data": [{ "...": "..." }],
+  "meta": {
+    "total": 156592,
+    "paginated": false
+  }
+}</code></pre>
+
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/categories</span></h3>
             <p>Lista categorie: <code>id</code>, <code>name_en</code>, <code>name_it</code>.</p>
 
-            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/search?q=duomo</span></h3>
-            <p>Ricerca testuale sui titoli dei POI. Parametro richiesto: <code>q</code>. Risponde con <code>{"data":[...]}</code> usando gli stessi oggetti mock della lista.</p>
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/search?q=Amiternum</span></h3>
+            <p>Ricerca testuale su titoli, tipologie, categorie, citta, province, regioni e indirizzi dei POI. Parametro richiesto: <code>q</code>; <code>limit</code> e opzionale da 1 a 500. Risponde con <code>{"data":[...]}</code> usando gli stessi oggetti reali della lista.</p>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/create</span></h3>
-            <p>Propone un nuovo luogo. Campi principali: <code>lat</code>, <code>lng</code>, <code>title</code>, <code>category</code>, <code>descr</code>, <code>image_url</code>. Per compatibilita accetta ancora <code>lon</code>, <code>name</code> e <code>picture</code>. Risponde <code>{"status":"OK"}</code> o <code>{"status":"KO"}</code>.</p>
+            <p>Crea un nuovo POI nella tabella reale. Campi principali: <code>lat</code>, <code>lng</code>, <code>title</code>, <code>category</code>, <code>descr</code>, <code>image_url</code>. <code>schedaType</code> e opzionale e defaulta a <code>base</code>. Per compatibilita accetta ancora <code>lon</code>, <code>name</code> e <code>picture</code>. Risponde <code>{"status":"OK","id":...}</code> o <code>{"status":"KO"}</code>.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/{id|slug}/view</span></h3>
-            <p>Dettaglio POI richiamabile con id numerico, ad esempio <code>101</code>, oppure slug, ad esempio <code>duomo-milano</code>. Include i campi stile <code>culturalSites</code>, <code>pictures</code>, contatori, <code>days_open</code>, <code>hours_open</code>, <code>tickets_info</code> e <code>booking_info</code>.</p>
+            <p>Dettaglio POI richiamabile con id numerico, ad esempio <code>1</code>, oppure slug, ad esempio <code>amiternum</code>. Include i campi stile <code>culturalSites</code>, <code>pictures</code>, contatori, <code>days_open</code>, <code>hours_open</code>, <code>tickets_info</code> e <code>booking_info</code>.</p>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/{id|slug}/bookmark</span></h3>
+            <p>Salva un POI nei bookmark dell'utente corrente. Campo opzionale: <code>folder_id</code>. <code>DELETE</code> sullo stesso path rimuove il bookmark.</p>
         </section>
 
         <section>
             <h2>Pictures</h2>
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pictures/list</span></h3>
-            <p>Lista ultime immagini pubblicate con oggetti relazionati <code>poi</code> e <code>user</code>, piu <code>likes_num</code>, <code>bookmarks_num</code> e <code>comments_num</code>.</p>
+            <p>Lista ultime immagini pubblicate con oggetti relazionati <code>poi</code> e <code>user</code>, piu <code>caption</code>, <code>exif_lat</code>, <code>exif_lng</code>, <code>likes_num</code>, <code>bookmarks_num</code> e <code>comments_num</code>. Le immagini reali persistite precedono i dati mock di fallback.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pictures/{id}/view</span></h3>
-            <p>Dettaglio immagine con <code>likes</code>, <code>comments</code> e <code>bookmarks</code>.</p>
+            <p>Dettaglio immagine con <code>caption</code>, coordinate EXIF <code>exif_lat</code>/<code>exif_lng</code>, <code>likes</code>, <code>comments</code> e <code>bookmarks</code>.</p>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/upload</span></h3>
+            <p>Upload multipart dell'asset immagine usando <code>System\Models\File</code> di Winter CMS. Campo file richiesto: <code>picture</code> oppure <code>file</code>. Estensioni accettate: <code>jpg</code>, <code>jpeg</code>, <code>png</code>, <code>webp</code>, <code>heic</code>, <code>heif</code>. Risponde con <code>system_file_id</code>, <code>url</code>/<code>picture</code> e coordinate EXIF estratte, se presenti.</p>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/create</span></h3>
-            <p>Crea una foto per un <code>poi_id</code>. Campi richiesti: <code>poi_id</code>, <code>picture</code>.</p>
+            <p>Crea e persiste una foto per un <code>poi_id</code>. Accetta JSON con <code>picture</code> URL, <code>system_file_id</code> restituito dall'upload, oppure multipart con file <code>picture</code>/<code>file</code>. Campi opzionali: <code>caption</code> massimo 500 caratteri, <code>exif_lat</code>, <code>exif_lng</code> oppure <code>exif_gps.lat</code>/<code>exif_gps.lng</code>. Se il multipart contiene coordinate EXIF reali, vengono usate come fallback quando le coordinate non sono passate dal client.</p>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/{id}/like</span></h3>
+            <p>Aggiunge un like alla foto per l'utente corrente. <code>DELETE</code> sullo stesso path rimuove il like. Risponde con <code>liked</code> e <code>likes_num</code>.</p>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/{id}/bookmark</span></h3>
+            <p>Salva una foto nei bookmark dell'utente corrente. Campo opzionale: <code>folder_id</code>. <code>DELETE</code> sullo stesso path rimuove il bookmark.</p>
 
             <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/pictures/{id}/delete</span></h3>
             <p>Elimina solo se lo user proprietario della foto coincide con l'utente corrente mock.</p>
@@ -433,6 +462,9 @@
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/create</span></h3>
             <p>Crea un commento o una risposta sul target indicato da <code>{id}</code>. Campo richiesto: <code>comment_text</code>.</p>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/like</span></h3>
+            <p>Aggiunge un like al commento per l'utente corrente. <code>DELETE</code> sullo stesso path rimuove il like. Risponde con <code>liked</code> e <code>likes_num</code>.</p>
 
             <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/comments/{id}/delete</span></h3>
             <p>Elimina solo se <code>owner_user_id</code> coincide con l'utente corrente mock.</p>
@@ -454,6 +486,9 @@
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/bookmarks</span></h3>
             <p>Bookmark dell'utente corrente, divisi in POI, foto e cartelle.</p>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/bookmarks/create</span></h3>
+            <p>Crea un bookmark generico. Accetta <code>target_type</code> (<code>poi</code> o <code>picture</code>), <code>target_id</code> e <code>folder_id</code> opzionale. Per compatibilita accetta anche <code>poi_id</code> o <code>picture_id</code>. <code>DELETE /api/v1/bookmarks/delete</code> rimuove lo stesso target.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/badges</span></h3>
             <p>Badge dell'utente corrente, inclusi quelli non ancora completati con <code>progress</code> e <code>target</code>.</p>
@@ -493,11 +528,12 @@
 
         <section>
             <h2>Postman</h2>
-            <p>Importa la collection <code>LiveMuseum_API.postman_collection.json</code> per le rotte utenti e per i mock POI/social.</p>
+            <p>Importa la collection <code>LiveMuseum_API.postman_collection.json</code> per le rotte utenti, POI reali e fallback social provvisori.</p>
             <table>
                 <thead><tr><th>Variabile</th><th>Default</th><th>Uso</th></tr></thead>
                 <tbody>
-                    <tr><td><code>baseUrl</code></td><td><code>http://localhost:8091</code></td><td>Host API.</td></tr>
+                    <tr><td><code>baseUrl</code></td><td><code>http://localhost:8091</code></td><td>Host API. Per staging usare <code>https://platform.staging.livemuseum.it</code>.</td></tr>
+                    <tr><td><code>stagingBaseUrl</code></td><td><code>https://platform.staging.livemuseum.it</code></td><td>Riferimento rapido per l'ambiente staging.</td></tr>
                     <tr><td><code>login</code></td><td><code>test@example.com</code></td><td>Login per richiesta Login.</td></tr>
                     <tr><td><code>password</code></td><td><code>password123</code></td><td>Password per login/register.</td></tr>
                     <tr><td><code>accessToken</code></td><td>Vuota</td><td>Salvata automaticamente dopo login o register con token.</td></tr>

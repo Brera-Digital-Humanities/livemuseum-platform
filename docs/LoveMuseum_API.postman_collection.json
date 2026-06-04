@@ -2,7 +2,7 @@
   "info": {
     "name": "LiveMuseum API v1",
     "_postman_id": "b3b1c1b5-7b17-4ec3-b0ea-livemuseum-api",
-    "description": "Postman collection for LiveMuseum /api/v1 endpoints: users, POIs, pictures, comments, profiles and bookmarks. Some endpoints are mock routes used by the mobile app while data models are being implemented.",
+    "description": "Postman collection for LiveMuseum /api/v1 endpoints: users, real POIs, pictures, comments, profiles and bookmarks. Social data and fields not yet modeled can still use temporary fallback values.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -745,7 +745,7 @@
                   "  var json = pm.response.json();",
                   "  pm.expect(json.data).to.be.an('array');",
                   "  if (json.data.length) {",
-                  "    pm.expect(json.data[0]).to.include.keys('id', 'id_opendata', 'type', 'title', 'fulladdress', 'address', 'region', 'province', 'city', 'zipcode', 'lat', 'lng', 'image_url', 'services');",
+                  "    pm.expect(json.data[0]).to.include.keys('id', 'id_opendata', 'type', 'schedaType', 'title', 'fulladdress', 'address', 'region', 'province', 'city', 'zipcode', 'lat', 'lng', 'image_url', 'services');",
                   "  }",
                   "});"
                 ],
@@ -781,6 +781,63 @@
                   "key": "lng",
                   "value": "{{lng}}"
                 }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List all POIs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test('returns unpaginated POIs', function () {",
+                  "  var json = pm.response.json();",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "  pm.expect(json.data.length).to.be.at.least(100);",
+                  "  pm.expect(json.meta).to.include({ paginated: false });",
+                  "  pm.expect(json.meta.total).to.be.at.least(100);",
+                  "});",
+                  "pm.test('POIs include related fallback data', function () {",
+                  "  var json = pm.response.json();",
+                  "  pm.expect(json.data[0]).to.include.keys('pictures', 'last_picture', 'likes', 'comments', 'bookmarks');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-KEY",
+                "value": "{{poisApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pois/all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pois",
+                "all"
               ]
             }
           },
@@ -921,7 +978,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"lat\": 45.464211,\n  \"lng\": 9.191383,\n  \"title\": \"Nuovo luogo mock\",\n  \"category\": 1,\n  \"descr\": \"Descrizione proposta dal client.\",\n  \"image_url\": \"https://picsum.photos/seed/lm-new-poi/1200/900\"\n}"
+              "raw": "{\n  \"lat\": 45.464211,\n  \"lng\": 9.191383,\n  \"title\": \"Nuovo luogo\",\n  \"category\": \"Monumento\",\n  \"schedaType\": \"base\",\n  \"descr\": \"Descrizione proposta dal client.\",\n  \"image_url\": \"https://picsum.photos/seed/lm-new-poi/1200/900\"\n}"
             }
           },
           "response": []
@@ -942,7 +999,7 @@
                   "});",
                   "pm.test('POI has culturalSites-compatible fields', function () {",
                   "  var json = pm.response.json();",
-                  "  pm.expect(json).to.include.keys('id', 'id_opendata', 'type', 'title', 'fulladdress', 'address', 'region', 'province', 'city', 'zipcode', 'lat', 'lng', 'image_url', 'services');",
+                  "  pm.expect(json).to.include.keys('id', 'id_opendata', 'type', 'schedaType', 'title', 'fulladdress', 'address', 'region', 'province', 'city', 'zipcode', 'lat', 'lng', 'image_url', 'services');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -989,7 +1046,7 @@
                   "});",
                   "pm.test('POI has culturalSites-compatible fields', function () {",
                   "  var json = pm.response.json();",
-                  "  pm.expect(json).to.include.keys('id', 'id_opendata', 'type', 'title', 'fulladdress', 'address', 'region', 'province', 'city', 'zipcode', 'lat', 'lng', 'image_url', 'services');",
+                  "  pm.expect(json).to.include.keys('id', 'id_opendata', 'type', 'schedaType', 'title', 'fulladdress', 'address', 'region', 'province', 'city', 'zipcode', 'lat', 'lng', 'image_url', 'services');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1111,6 +1168,67 @@
           "response": []
         },
         {
+          "name": "Upload picture asset",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201 or 422', function () {",
+                  "  pm.expect([201,422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test('upload returns Winter file id and URL', function () {",
+                  "  if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('system_file_id');",
+                  "    pm.expect(json).to.have.property('url');",
+                  "    pm.collectionVariables.set('pictureSystemFileId', String(json.system_file_id));",
+                  "    pm.collectionVariables.set('pictureUrl', json.url);",
+                  "  }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pictures/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pictures",
+                "upload"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "picture",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Create picture",
           "event": [
             {
@@ -1123,6 +1241,14 @@
                   "pm.test('response is json', function () {",
                   "  pm.response.to.be.withBody;",
                   "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test('created picture exposes caption and exif fields', function () {",
+                  "  if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('caption');",
+                  "    pm.expect(json).to.have.property('exif_lat');",
+                  "    pm.expect(json).to.have.property('exif_lng');",
+                  "  }",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1155,7 +1281,205 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"poi_id\": \"{{poiId}}\",\n  \"picture\": \"https://picsum.photos/seed/lm-upload/1200/900\",\n  \"user_id\": \"{{currentUserId}}\"\n}"
+              "raw": "{\n  \"poi_id\": \"{{poiId}}\",\n  \"picture\": \"{{pictureUrl}}\",\n  \"user_id\": \"{{currentUserId}}\",\n  \"caption\": \"Vista caricata dall'app\",\n  \"exif_lat\": \"42.4007760\",\n  \"exif_lng\": \"13.3057690\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Like picture",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 201 or 404', function () {",
+                  "  pm.expect([200,201,404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pictures/{{pictureId}}/like?user_id={{currentUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pictures",
+                "{{pictureId}}",
+                "like"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{currentUserId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unlike picture",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 404', function () {",
+                  "  pm.expect([200,404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pictures/{{pictureId}}/like?user_id={{currentUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pictures",
+                "{{pictureId}}",
+                "like"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{currentUserId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bookmark picture",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 201 or 404', function () {",
+                  "  pm.expect([200,201,404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pictures/{{pictureId}}/bookmark",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pictures",
+                "{{pictureId}}",
+                "bookmark"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{currentUserId}}\",\n  \"folder_id\": \"{{folderId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove picture bookmark",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 404', function () {",
+                  "  pm.expect([200,404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pictures/{{pictureId}}/bookmark?user_id={{currentUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pictures",
+                "{{pictureId}}",
+                "bookmark"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{currentUserId}}"
+                }
+              ]
             }
           },
           "response": []
@@ -1261,6 +1585,104 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"comment_text\": \"Commento mock dalla collection Postman.\",\n  \"user_id\": \"{{currentUserId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Like comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 201 or 404', function () {",
+                  "  pm.expect([200,201,404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/comments/{{commentId}}/like?user_id={{currentUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "comments",
+                "{{commentId}}",
+                "like"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{currentUserId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unlike comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 404', function () {",
+                  "  pm.expect([200,404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/comments/{{commentId}}/like?user_id={{currentUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "comments",
+                "{{commentId}}",
+                "like"
+              ],
+              "query": [
+                {
+                  "key": "user_id",
+                  "value": "{{currentUserId}}"
+                }
+              ]
             }
           },
           "response": []
@@ -1541,6 +1963,112 @@
                 "users",
                 "my",
                 "bookmarks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add bookmark",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 201 or 404 or 422', function () {",
+                  "  pm.expect([200,201,404,422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookmarks/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookmarks",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_type\": \"poi\",\n  \"target_id\": \"{{poiId}}\",\n  \"folder_id\": \"{{folderId}}\",\n  \"user_id\": \"{{currentUserId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove bookmark",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 404 or 422', function () {",
+                  "  pm.expect([200,404,422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookmarks/delete?target_type=poi&target_id={{poiId}}&user_id={{currentUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookmarks",
+                "delete"
+              ],
+              "query": [
+                {
+                  "key": "target_type",
+                  "value": "poi"
+                },
+                {
+                  "key": "target_id",
+                  "value": "{{poiId}}"
+                },
+                {
+                  "key": "user_id",
+                  "value": "{{currentUserId}}"
+                }
               ]
             }
           },
@@ -1851,6 +2379,7 @@
           "}",
           "if (!pm.collectionVariables.get('lat')) { pm.collectionVariables.set('lat', '45.4642'); }",
           "if (!pm.collectionVariables.get('lng')) { pm.collectionVariables.set('lng', '9.1900'); }",
+          "if (!pm.collectionVariables.get('poisApiKey')) { pm.collectionVariables.set('poisApiKey', 'livemuseum-pois-dev-key'); }",
           "if (!pm.collectionVariables.get('currentUserId')) { pm.collectionVariables.set('currentUserId', '1'); }"
         ],
         "type": "text/javascript"
@@ -1861,6 +2390,11 @@
     {
       "key": "baseUrl",
       "value": "http://localhost:8091",
+      "type": "string"
+    },
+    {
+      "key": "stagingBaseUrl",
+      "value": "https://platform.staging.livemuseum.it",
       "type": "string"
     },
     {
@@ -1939,23 +2473,38 @@
       "type": "string"
     },
     {
+      "key": "poisApiKey",
+      "value": "livemuseum-pois-dev-key",
+      "type": "string"
+    },
+    {
       "key": "poiId",
-      "value": "101",
+      "value": "1",
       "type": "string"
     },
     {
       "key": "poiSlug",
-      "value": "duomo-milano",
+      "value": "amiternum",
       "type": "string"
     },
     {
       "key": "poiSearch",
-      "value": "duomo",
+      "value": "Amiternum",
       "type": "string"
     },
     {
       "key": "pictureId",
       "value": "501",
+      "type": "string"
+    },
+    {
+      "key": "pictureSystemFileId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pictureUrl",
+      "value": "https://picsum.photos/seed/lm-upload/1200/900",
       "type": "string"
     },
     {
