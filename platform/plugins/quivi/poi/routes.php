@@ -264,6 +264,16 @@ function lmPoiLimit(Request $request, $default = 100, $max = 500)
     return min($limit, $max);
 }
 
+function lmPageParams(Request $request, $defaultPerPage = 20, $maxPerPage = 100)
+{
+    $perPage = (int) $request->input('per_page', $request->input('limit', $defaultPerPage));
+    $perPage = max(1, min($perPage, $maxPerPage));
+    $page    = max(1, (int) $request->input('page', 1));
+    $offset  = ($page - 1) * $perPage;
+
+    return compact('page', 'perPage', 'offset');
+}
+
 function lmPoiJsonDecode($value)
 {
     if (is_array($value)) {
@@ -878,18 +888,38 @@ function lmCommentsWithEngagement(array $comments)
     return $comments;
 }
 
-function lmStoredPictureRows($limit = 50)
+function lmStoredPictureRows($limit = 50, $offset = 0, $poiId = null)
 {
     if (!lmPictureTableExists()) {
         return [];
     }
 
-    return Db::table('quivi_poi_pictures')
-        ->whereNull('deleted_at')
-        ->orderBy('created_at', 'desc')
+    $q = Db::table('quivi_poi_pictures')->whereNull('deleted_at');
+
+    if ($poiId !== null) {
+        $q->where('poi_id', (int) $poiId);
+    }
+
+    return $q->orderBy('created_at', 'desc')
         ->orderBy('id', 'desc')
         ->limit($limit)
+        ->offset($offset)
         ->get();
+}
+
+function lmStoredPictureCount($poiId = null)
+{
+    if (!lmPictureTableExists()) {
+        return 0;
+    }
+
+    $q = Db::table('quivi_poi_pictures')->whereNull('deleted_at');
+
+    if ($poiId !== null) {
+        $q->where('poi_id', (int) $poiId);
+    }
+
+    return (int) $q->count();
 }
 
 function lmStoredPicturesForPoi($poiId, $limit = 2)
@@ -1703,6 +1733,42 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
         $total = (int) Db::table('quivi_poi_pois')->whereNull('deleted_at')->count();
 
+        // Paginated mode: ?page=N[&per_page=N]
+        if ($request->filled('page')) {
+            $validator = Validator::make($request->all(), [
+                'page'     => 'integer|min:1',
+                'per_page' => 'nullable|integer|min:1|max:500',
+                'limit'    => 'nullable|integer|min:1|max:500',
+            ]);
+
+            if ($validator->fails()) {
+                return Response::json(['errors' => $validator->errors()], 422);
+            }
+
+            ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
+
+            $rows = lmPoiBaseQuery(false)
+                ->orderBy('id')
+                ->limit($perPage)
+                ->offset($offset)
+                ->get();
+
+            $items = lmPoiResponses($rows, ['related' => 'compact']);
+
+            return Response::json([
+                'data' => $items,
+                'meta' => [
+                    'total'     => $total,
+                    'page'      => $page,
+                    'per_page'  => $perPage,
+                    'last_page' => max(1, (int) ceil($total / $perPage)),
+                    'has_more'  => ($offset + count($items)) < $total,
+                    'paginated' => true,
+                ],
+            ]);
+        }
+
+        // Legacy streaming mode: returns all records
         return Response::stream(function () use ($total) {
             set_time_limit(0);
             $first = true;
@@ -1874,24 +1940,117 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
         return Response::json($poi);
     });
+
+    Route::get('{identifier}/pictures', function (Request $request, $identifier) {
+        $poi = lmMockPoi($identifier);
+
+        if (!$poi) {
+            return Response::json(['error' => 'POI not found.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'sort'     => 'nullable|in:recent,top',
+            'page'     => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
+            'limit'    => 'nullable|integer|min:1|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        $poiId = (int) $poi['id'];
+        ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request);
+
+        $total = lmStoredPictureCount($poiId);
+
+        $q = lmPictureTableExists()
+            ? Db::table('quivi_poi_pictures')
+                ->where('poi_id', $poiId)
+                ->whereNull('deleted_at')
+            : null;
+
+        if ($q) {
+            if ($request->input('sort') === 'top') {
+                $q->orderByRaw('(SELECT COUNT(*) FROM quivi_poi_picture_likes WHERE picture_id = quivi_poi_pictures.id) DESC');
+            } else {
+                $q->orderBy('created_at', 'desc')->orderBy('id', 'desc');
+            }
+
+            $rows = $q->limit($perPage)->offset($offset)->get();
+        } else {
+            $rows = [];
+        }
+
+        $items = lmPictureResponses($rows, false, true);
+
+        // Fall back to the inline pictures from the POI response when the DB is empty
+        if ($total === 0 && $page === 1) {
+            $items = $poi['pictures'] ?? [];
+            $total = count($items);
+        }
+
+        return Response::json([
+            'data' => $items,
+            'meta' => [
+                'total'     => $total,
+                'page'      => $page,
+                'per_page'  => $perPage,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'has_more'  => ($offset + count($items)) < $total,
+            ],
+        ]);
+    });
 });
 
 Route::group(['prefix' => 'api/v1/pictures'], function () {
-    Route::get('list', function () {
-        $storedPictures = array_map(function ($picture) {
+    Route::get('list', function (Request $request) {
+        $validator = Validator::make($request->all(), [
+            'poi_id'   => 'nullable|integer|min:1',
+            'page'     => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
+            'limit'    => 'nullable|integer|min:1|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        $poiId = $request->filled('poi_id') ? (int) $request->input('poi_id') : null;
+        ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request);
+
+        $total  = lmStoredPictureCount($poiId);
+        $rows   = lmStoredPictureRows($perPage, $offset, $poiId);
+
+        $items = array_map(function ($picture) {
             unset($picture['poi_id'], $picture['likes'], $picture['comments'], $picture['bookmarks']);
 
             return $picture;
-        }, lmPictureResponses(lmStoredPictureRows(50), true, false));
+        }, lmPictureResponses($rows, true, false));
 
-        $mockPictures = array_map(function ($picture) {
-            $picture['poi'] = lmMockPoi($picture['poi_id']);
-            unset($picture['poi_id'], $picture['likes'], $picture['comments'], $picture['bookmarks']);
+        // Append mock pictures only on page 1 when no poi_id filter is active and stored results are sparse
+        if ($poiId === null && $page === 1 && count($items) < $perPage) {
+            $mockItems = array_map(function ($picture) {
+                $picture['poi'] = lmMockPoi($picture['poi_id']);
+                unset($picture['poi_id'], $picture['likes'], $picture['comments'], $picture['bookmarks']);
 
-            return $picture;
-        }, lmMockPictures());
+                return $picture;
+            }, lmMockPictures());
 
-        return Response::json(['data' => array_merge($storedPictures, $mockPictures)]);
+            $items = array_merge($items, $mockItems);
+            $total = max($total, count($items));
+        }
+
+        return Response::json([
+            'data' => $items,
+            'meta' => [
+                'total'        => $total,
+                'page'         => $page,
+                'per_page'     => $perPage,
+                'last_page'    => max(1, (int) ceil($total / $perPage)),
+                'has_more'     => ($offset + count($items)) < $total,
+            ],
+        ]);
     });
 
     Route::post('upload', function (Request $request) {

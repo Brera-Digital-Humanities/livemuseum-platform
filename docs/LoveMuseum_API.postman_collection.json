@@ -787,7 +787,7 @@
           "response": []
         },
         {
-          "name": "List all POIs",
+          "name": "List all POIs (paginated)",
           "event": [
             {
               "listen": "test",
@@ -800,16 +800,74 @@
                   "  pm.response.to.be.withBody;",
                   "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
                   "});",
-                  "pm.test('returns unpaginated POIs', function () {",
+                  "pm.test('returns paginated meta', function () {",
                   "  var json = pm.response.json();",
                   "  pm.expect(json.data).to.be.an('array');",
-                  "  pm.expect(json.data.length).to.be.at.least(100);",
-                  "  pm.expect(json.meta).to.include({ paginated: false });",
-                  "  pm.expect(json.meta.total).to.be.at.least(100);",
+                  "  pm.expect(json.meta).to.include.keys('total', 'page', 'per_page', 'last_page', 'has_more');",
+                  "  pm.expect(json.meta.paginated).to.equal(true);",
+                  "  pm.expect(json.meta.total).to.be.at.least(1);",
                   "});",
                   "pm.test('POIs include related fallback data', function () {",
                   "  var json = pm.response.json();",
                   "  pm.expect(json.data[0]).to.include.keys('pictures', 'last_picture', 'likes', 'comments', 'bookmarks');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-KEY",
+                "value": "{{poisApiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pois/all?page=1&per_page=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pois",
+                "all"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "100"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List all POIs (streaming legacy)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.expect([200]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('returns unpaginated streaming meta', function () {",
+                  "  var json = pm.response.json();",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "  pm.expect(json.meta).to.include({ paginated: false });",
+                  "  pm.expect(json.meta.total).to.be.at.least(1);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1076,6 +1134,71 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "List POI pictures",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200 or 404', function () {",
+                  "  pm.expect([200, 404]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('response is json', function () {",
+                  "  pm.response.to.be.withBody;",
+                  "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('returns paginated meta', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "    pm.expect(json.meta).to.include.keys('total', 'page', 'per_page', 'last_page', 'has_more');",
+                  "  });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pois/{{poiSlug}}/pictures?sort=recent&page=1&per_page=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pois",
+                "{{poiSlug}}",
+                "pictures"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "recent",
+                  "description": "recent (default) | top"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -1095,6 +1218,11 @@
                   "pm.test('response is json', function () {",
                   "  pm.response.to.be.withBody;",
                   "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test('returns paginated meta', function () {",
+                  "  var json = pm.response.json();",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "  pm.expect(json.meta).to.include.keys('total', 'page', 'per_page', 'last_page', 'has_more');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -1110,7 +1238,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/pictures/list",
+              "raw": "{{baseUrl}}/api/v1/pictures/list?page=1&per_page=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1119,6 +1247,22 @@
                 "v1",
                 "pictures",
                 "list"
+              ],
+              "query": [
+                {
+                  "key": "poi_id",
+                  "value": "",
+                  "description": "Filtra per POI (opzionale)",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "20"
+                }
               ]
             }
           },

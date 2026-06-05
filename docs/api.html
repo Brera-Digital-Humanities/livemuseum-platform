@@ -404,16 +404,41 @@
 }</code></pre>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/all</span></h3>
-            <p>Restituisce tutti i POI reali non paginati con risposta JSON in streaming. Richiede API key in header <code>X-API-KEY</code> oppure parametro <code>api_key</code>. La chiave lato server e configurata con <code>POIS_API_KEY</code>.</p>
-            <pre><code>curl http://localhost:8091/api/v1/pois/all \
+            <p>Restituisce i POI reali. Richiede API key in header <code>X-API-KEY</code> oppure parametro <code>api_key</code>. La chiave lato server e configurata con <code>POIS_API_KEY</code>.</p>
+            <p>Supporta due modalita:</p>
+            <ul>
+                <li><strong>Paginata</strong> (consigliata): passare <code>page</code> e opzionalmente <code>per_page</code> (default 100, max 500). La risposta include un oggetto <code>meta</code> con <code>total</code>, <code>page</code>, <code>per_page</code>, <code>last_page</code>, <code>has_more</code> e <code>paginated: true</code>.</li>
+                <li><strong>Streaming legacy</strong>: senza <code>page</code>, restituisce tutti i record in streaming JSON. La risposta include <code>meta.paginated: false</code>. Usare solo per export bulk.</li>
+            </ul>
+            <table>
+                <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (intera &ge;1). Se assente, attiva la modalita streaming.</td></tr>
+                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 500.</td></tr>
+                </tbody>
+            </table>
+            <pre><code># Modalita paginata
+curl "http://localhost:8091/api/v1/pois/all?page=1&per_page=100" \
   -H "Accept: application/json" \
   -H "X-API-KEY: livemuseum-pois-dev-key"</code></pre>
             <pre><code>{
   "data": [{ "...": "..." }],
   "meta": {
     "total": 156592,
-    "paginated": false
+    "page": 1,
+    "per_page": 100,
+    "last_page": 1566,
+    "has_more": true,
+    "paginated": true
   }
+}</code></pre>
+            <pre><code># Modalita streaming legacy (export bulk)
+curl "http://localhost:8091/api/v1/pois/all" \
+  -H "Accept: application/json" \
+  -H "X-API-KEY: livemuseum-pois-dev-key"</code></pre>
+            <pre><code>{
+  "data": [{ "...": "..." }],
+  "meta": { "total": 156592, "paginated": false }
 }</code></pre>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/categories</span></h3>
@@ -428,6 +453,23 @@
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/{id|slug}/view</span></h3>
             <p>Dettaglio POI richiamabile con id numerico, ad esempio <code>1</code>, oppure slug, ad esempio <code>amiternum</code>. Include i campi stile <code>culturalSites</code>, <code>pictures</code>, contatori, <code>days_open</code>, <code>hours_open</code>, <code>tickets_info</code> e <code>booking_info</code>.</p>
 
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/{id|slug}/pictures</span></h3>
+            <p>Lista paginata delle foto caricate su un POI, con contatori <code>likes_num</code>, <code>comments_num</code>, <code>bookmarks_num</code> e dati EXIF. Se il database foto e vuoto, restituisce le immagini inline presenti nel dettaglio POI.</p>
+            <table>
+                <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>sort</code></td><td>No</td><td><code>recent</code> (default) ordina per data; <code>top</code> ordina per like.</td></tr>
+                    <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
+                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 20, max 100.</td></tr>
+                </tbody>
+            </table>
+            <pre><code>curl "http://localhost:8091/api/v1/pois/cappella-di-santa-teresa/pictures?sort=top&page=1&per_page=20" \
+  -H "Accept: application/json"</code></pre>
+            <pre><code>{
+  "data": [{ "id": 1, "picture": "https://...", "likes_num": 42, "..." : "..." }],
+  "meta": { "total": 328, "page": 1, "per_page": 20, "last_page": 17, "has_more": true }
+}</code></pre>
+
             <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/{id|slug}/bookmark</span></h3>
             <p>Salva un POI nei bookmark dell'utente corrente. Campo opzionale: <code>folder_id</code>. <code>DELETE</code> sullo stesso path rimuove il bookmark.</p>
         </section>
@@ -435,7 +477,19 @@
         <section>
             <h2>Pictures</h2>
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pictures/list</span></h3>
-            <p>Lista ultime immagini pubblicate con oggetti relazionati <code>poi</code> e <code>user</code>, piu <code>caption</code>, <code>exif_lat</code>, <code>exif_lng</code>, <code>likes_num</code>, <code>bookmarks_num</code> e <code>comments_num</code>. Le immagini reali persistite precedono i dati mock di fallback.</p>
+            <p>Lista paginata delle immagini pubblicate con oggetti relazionati <code>poi</code> e <code>user</code>, piu <code>caption</code>, <code>exif_lat</code>, <code>exif_lng</code>, <code>likes_num</code>, <code>bookmarks_num</code> e <code>comments_num</code>. Le immagini reali persistite hanno precedenza; i mock di fallback vengono aggiunti solo a pagina 1 senza filtro <code>poi_id</code>.</p>
+            <table>
+                <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>poi_id</code></td><td>No</td><td>Filtra le foto di uno specifico POI.</td></tr>
+                    <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
+                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 20, max 100.</td></tr>
+                </tbody>
+            </table>
+            <pre><code>{
+  "data": [{ "id": 1, "picture": "https://...", "poi": {}, "user": {}, "...": "..." }],
+  "meta": { "total": 84, "page": 1, "per_page": 20, "last_page": 5, "has_more": true }
+}</code></pre>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pictures/{id}/view</span></h3>
             <p>Dettaglio immagine con <code>caption</code>, coordinate EXIF <code>exif_lat</code>/<code>exif_lng</code>, <code>likes</code>, <code>comments</code> e <code>bookmarks</code>.</p>
