@@ -956,7 +956,14 @@
                   "pm.test('response is json', function () {",
                   "  pm.response.to.be.withBody;",
                   "  pm.expect(function () { pm.response.json(); }).not.to.throw();",
-                  "});"
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  pm.test('has paginated meta', function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('meta');",
+                  "    pm.expect(body.meta).to.have.all.keys('total','page','per_page','last_page','has_more');",
+                  "  });",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -971,7 +978,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/pois/search?q={{poiSearch}}",
+              "raw": "{{baseUrl}}/api/v1/pois/search?q={{poiSearch}}&page=1&per_page=100",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -985,6 +992,14 @@
                 {
                   "key": "q",
                   "value": "{{poiSearch}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "100"
                 }
               ]
             }
@@ -1170,7 +1185,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/pois/{{poiSlug}}/pictures?sort=recent&page=1&per_page=20",
+              "raw": "{{baseUrl}}/api/v1/pois/{{poiSlug}}/pictures?sort=recent&page=1&per_page=100",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1193,7 +1208,7 @@
                 },
                 {
                   "key": "per_page",
-                  "value": "20"
+                  "value": "100"
                 }
               ]
             }
@@ -1238,7 +1253,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/pictures/list?page=1&per_page=20",
+              "raw": "{{baseUrl}}/api/v1/pictures/list?page=1&per_page=100",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1261,7 +1276,7 @@
                 },
                 {
                   "key": "per_page",
-                  "value": "20"
+                  "value": "100"
                 }
               ]
             }

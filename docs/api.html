@@ -445,7 +445,21 @@ curl "http://localhost:8091/api/v1/pois/all" \
             <p>Lista categorie: <code>id</code>, <code>name_en</code>, <code>name_it</code>.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/search?q=Amiternum</span></h3>
-            <p>Ricerca testuale su titoli, tipologie, categorie, citta, province, regioni e indirizzi dei POI. Parametro richiesto: <code>q</code>; <code>limit</code> e opzionale da 1 a 500. Risponde con <code>{"data":[...]}</code> usando gli stessi oggetti reali della lista.</p>
+            <p>Ricerca testuale su titoli, tipologie, categorie, citta, province, regioni e indirizzi dei POI. Restituisce gli stessi oggetti reali della lista, con metadati di paginazione.</p>
+            <table>
+                <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>q</code></td><td>Si</td><td>Testo da cercare.</td></tr>
+                    <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
+                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 500.</td></tr>
+                </tbody>
+            </table>
+            <pre><code>curl "http://localhost:8091/api/v1/pois/search?q=Amiternum&page=1&per_page=100" \
+  -H "Accept: application/json"</code></pre>
+            <pre><code>{
+  "data": [{ "id": 12345, "title": "Amiternum", "...": "..." }],
+  "meta": { "total": 3, "page": 1, "per_page": 20, "last_page": 1, "has_more": false }
+}</code></pre>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/create</span></h3>
             <p>Crea un nuovo POI nella tabella reale. Campi principali: <code>lat</code>, <code>lng</code>, <code>title</code>, <code>category</code>, <code>descr</code>, <code>image_url</code>. <code>schedaType</code> e opzionale e defaulta a <code>base</code>. Per compatibilita accetta ancora <code>lon</code>, <code>name</code> e <code>picture</code>. Risponde <code>{"status":"OK","id":...}</code> o <code>{"status":"KO"}</code>.</p>
@@ -460,7 +474,7 @@ curl "http://localhost:8091/api/v1/pois/all" \
                 <tbody>
                     <tr><td><code>sort</code></td><td>No</td><td><code>recent</code> (default) ordina per data; <code>top</code> ordina per like.</td></tr>
                     <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
-                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 20, max 100.</td></tr>
+                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 100.</td></tr>
                 </tbody>
             </table>
             <pre><code>curl "http://localhost:8091/api/v1/pois/cappella-di-santa-teresa/pictures?sort=top&page=1&per_page=20" \
@@ -483,7 +497,7 @@ curl "http://localhost:8091/api/v1/pois/all" \
                 <tbody>
                     <tr><td><code>poi_id</code></td><td>No</td><td>Filtra le foto di uno specifico POI.</td></tr>
                     <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
-                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 20, max 100.</td></tr>
+                    <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 100.</td></tr>
                 </tbody>
             </table>
             <pre><code>{

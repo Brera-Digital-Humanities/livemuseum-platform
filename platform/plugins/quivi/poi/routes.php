@@ -264,7 +264,7 @@ function lmPoiLimit(Request $request, $default = 100, $max = 500)
     return min($limit, $max);
 }
 
-function lmPageParams(Request $request, $defaultPerPage = 20, $maxPerPage = 100)
+function lmPageParams(Request $request, $defaultPerPage = 100, $maxPerPage = 100)
 {
     $perPage = (int) $request->input('per_page', $request->input('limit', $defaultPerPage));
     $perPage = max(1, min($perPage, $maxPerPage));
@@ -1456,31 +1456,44 @@ function lmMockPoi($identifier)
     return $row ? lmPoiResponse($row, ['related' => 'full']) : null;
 }
 
-function lmMockSearchPois($query, $limit = 100)
+function lmSearchPoisQuery($query)
 {
-    $query = trim((string) $query);
+    $like = '%' . str_replace(['%', '_'], ['\%', '\_'], trim((string) $query)) . '%';
 
-    if ($query === '') {
+    return lmPoiBaseQuery(false)
+        ->where(function ($q) use ($like) {
+            $q->where('title', 'like', $like)
+              ->orWhere('type', 'like', $like)
+              ->orWhere('category_app', 'like', $like)
+              ->orWhere('city', 'like', $like)
+              ->orWhere('province', 'like', $like)
+              ->orWhere('region', 'like', $like)
+              ->orWhere('fulladdress', 'like', $like);
+        });
+}
+
+function lmMockSearchPois($query, $limit = 100, $offset = 0)
+{
+    if (trim((string) $query) === '') {
         return [];
     }
 
-    $like = '%' . str_replace(['%', '_'], ['\%', '\_'], $query) . '%';
-    $rows = lmPoiBaseQuery(false)
-        ->where(function ($subQuery) use ($like) {
-            $subQuery
-                ->where('title', 'like', $like)
-                ->orWhere('type', 'like', $like)
-                ->orWhere('category_app', 'like', $like)
-                ->orWhere('city', 'like', $like)
-                ->orWhere('province', 'like', $like)
-                ->orWhere('region', 'like', $like)
-                ->orWhere('fulladdress', 'like', $like);
-        })
+    $rows = lmSearchPoisQuery($query)
         ->orderBy('title')
         ->limit($limit)
+        ->offset($offset)
         ->get();
 
     return lmPoiResponses($rows, ['related' => 'full']);
+}
+
+function lmSearchPoisCount($query)
+{
+    if (trim((string) $query) === '') {
+        return 0;
+    }
+
+    return (int) lmSearchPoisQuery($query)->count();
 }
 
 function lmPoiCategories()
@@ -1819,16 +1832,31 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
     Route::get('search', function (Request $request) {
         $validator = Validator::make($request->all(), [
-            'q' => 'required|string',
-            'limit' => 'nullable|integer|min:1|max:500',
+            'q'        => 'required|string',
+            'page'     => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:500',
+            'limit'    => 'nullable|integer|min:1|max:500',
         ]);
 
         if ($validator->fails()) {
             return Response::json(['errors' => $validator->errors()], 422);
         }
 
+        $q = $request->input('q');
+        ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
+
+        $total = lmSearchPoisCount($q);
+        $items = lmMockSearchPois($q, $perPage, $offset);
+
         return Response::json([
-            'data' => lmMockSearchPois($request->input('q'), lmPoiLimit($request)),
+            'data' => $items,
+            'meta' => [
+                'total'     => $total,
+                'page'      => $page,
+                'per_page'  => $perPage,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'has_more'  => ($offset + count($items)) < $total,
+            ],
         ]);
     });
 
