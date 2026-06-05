@@ -491,7 +491,7 @@ curl "http://localhost:8091/api/v1/pois/all" \
         <section>
             <h2>Pictures</h2>
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pictures/list</span></h3>
-            <p>Lista paginata delle immagini pubblicate con oggetti relazionati <code>poi</code> e <code>user</code>, piu <code>caption</code>, <code>exif_lat</code>, <code>exif_lng</code>, <code>likes_num</code>, <code>bookmarks_num</code> e <code>comments_num</code>. Le immagini reali persistite hanno precedenza; i mock di fallback vengono aggiunti solo a pagina 1 senza filtro <code>poi_id</code>.</p>
+            <p>Lista paginata delle immagini pubblicate con oggetti relazionati <code>poi</code> e <code>user</code>, piu <code>caption</code>, <code>exif_lat</code>, <code>exif_lng</code>, <code>likes_num</code>, <code>bookmarks_num</code> e <code>comments_num</code>. Le immagini reali persistite hanno precedenza; i mock di fallback vengono aggiunti solo a pagina 1 senza filtro <code>poi_id</code>. I POI embedded vengono caricati in un singolo batch query per pagina.</p>
             <table>
                 <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
                 <tbody>
@@ -501,8 +501,36 @@ curl "http://localhost:8091/api/v1/pois/all" \
                 </tbody>
             </table>
             <pre><code>{
-  "data": [{ "id": 1, "picture": "https://...", "poi": {}, "user": {}, "...": "..." }],
-  "meta": { "total": 84, "page": 1, "per_page": 20, "last_page": 5, "has_more": true }
+  "data": [{
+    "id": 1,
+    "picture": "https://...",
+    "caption": "Descrizione foto",
+    "exif_lat": 45.464,
+    "exif_lng": 9.190,
+    "likes_num": 42,
+    "bookmarks_num": 8,
+    "comments_num": 3,
+    "user": { "id": 1, "username": "mrossi", "...": "..." },
+    "poi": {
+      "id": 47954,
+      "slug": "cappella-di-santa-teresa",
+      "title": "Cappella di Santa Teresa",
+      "type": "cappella",
+      "category_app": "Chiesa",
+      "category": { "id": 5, "name_en": "Church", "name_it": "Chiesa" },
+      "schedaType": "base",
+      "city": "Milano",
+      "province": "Milano",
+      "lat": 45.464194,
+      "lng": 9.189635,
+      "image_url": "https://...",
+      "num_pictures": 19,
+      "num_likes": 1678,
+      "num_bookmarks": 28,
+      "num_comments": 60
+    }
+  }],
+  "meta": { "total": 84, "page": 1, "per_page": 100, "last_page": 1, "has_more": false }
 }</code></pre>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pictures/{id}/view</span></h3>

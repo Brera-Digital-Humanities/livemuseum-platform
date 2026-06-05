@@ -964,7 +964,7 @@ function lmStoredPicture($id)
         ->first();
 }
 
-function lmPictureResponse($row, $includePoi = false, $includeRelated = true)
+function lmPictureResponse($row, $includePoi = false, $includeRelated = true, $poiSummary = null)
 {
     $picture = [
         'id' => (int) $row->id,
@@ -981,7 +981,7 @@ function lmPictureResponse($row, $includePoi = false, $includeRelated = true)
     ];
 
     if ($includePoi) {
-        $picture['poi'] = lmMockPoi($row->poi_id);
+        $picture['poi'] = $poiSummary;
     }
 
     if ($includeRelated) {
@@ -1007,10 +1007,23 @@ function lmPictureResponse($row, $includePoi = false, $includeRelated = true)
 
 function lmPictureResponses($rows, $includePoi = false, $includeRelated = true)
 {
+    $poiMap = [];
+
+    if ($includePoi) {
+        $ids = [];
+        foreach ($rows as $row) {
+            if (!empty($row->poi_id)) {
+                $ids[] = (int) $row->poi_id;
+            }
+        }
+        $poiMap = lmPoiSummariesByIds($ids);
+    }
+
     $pictures = [];
 
     foreach ($rows as $row) {
-        $pictures[] = lmPictureResponse($row, $includePoi, $includeRelated);
+        $poiSummary = $includePoi ? ($poiMap[(int) ($row->poi_id ?? 0)] ?? null) : null;
+        $pictures[] = lmPictureResponse($row, $includePoi, $includeRelated, $poiSummary);
     }
 
     return $pictures;
@@ -1392,6 +1405,50 @@ function lmPoiResponse($row, array $options = [])
     }
 
     return $poi;
+}
+
+function lmPoiSummary($row)
+{
+    $categoryName = lmPoiText($row->category_app ?? null, 'Altro');
+    $category     = lmPoiCategoryForName($categoryName, $row->type ?? null);
+    $slug         = lmPoiText($row->slug ?? null, lmPoiText($row->code ?? null, 'poi-' . (int) $row->id));
+
+    return [
+        'id'            => (int) $row->id,
+        'slug'          => $slug,
+        'title'         => lmPoiText($row->title ?? null, 'POI #' . (int) $row->id),
+        'type'          => lmPoiText($row->type ?? null, $categoryName),
+        'category_app'  => $categoryName,
+        'category'      => $category,
+        'schedaType'    => lmPoiSchedaType($row->scheda_type ?? null),
+        'city'          => lmPoiText($row->city ?? null),
+        'province'      => lmPoiText($row->province ?? null),
+        'lat'           => $row->lat !== null ? (float) $row->lat : null,
+        'lng'           => $row->lng !== null ? (float) $row->lng : null,
+        'image_url'     => lmPoiImageUrl($row),
+        'num_pictures'  => lmPoiMetric($row->id, 1, 25),
+        'num_likes'     => lmPoiMetric($row->id, 60, 1800),
+        'num_bookmarks' => lmPoiBookmarksNum($row->id, lmPoiMetric($row->id, 10, 400)),
+        'num_comments'  => lmPoiMetric($row->id, 2, 120),
+    ];
+}
+
+function lmPoiSummariesByIds(array $ids)
+{
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+
+    if (!$ids) {
+        return [];
+    }
+
+    $rows = lmPoiBaseQuery(false)->whereIn('id', $ids)->get();
+    $map  = [];
+
+    foreach ($rows as $row) {
+        $map[(int) $row->id] = lmPoiSummary($row);
+    }
+
+    return $map;
 }
 
 function lmPoiResponses($rows, array $options = [])
@@ -2058,12 +2115,16 @@ Route::group(['prefix' => 'api/v1/pictures'], function () {
 
         // Append mock pictures only on page 1 when no poi_id filter is active and stored results are sparse
         if ($poiId === null && $page === 1 && count($items) < $perPage) {
-            $mockItems = array_map(function ($picture) {
-                $picture['poi'] = lmMockPoi($picture['poi_id']);
+            $mockPictures = lmMockPictures();
+            $mockPoiIds   = array_column($mockPictures, 'poi_id');
+            $mockPoiMap   = lmPoiSummariesByIds($mockPoiIds);
+
+            $mockItems = array_map(function ($picture) use ($mockPoiMap) {
+                $picture['poi'] = $mockPoiMap[(int) $picture['poi_id']] ?? null;
                 unset($picture['poi_id'], $picture['likes'], $picture['comments'], $picture['bookmarks']);
 
                 return $picture;
-            }, lmMockPictures());
+            }, $mockPictures);
 
             $items = array_merge($items, $mockItems);
             $total = max($total, count($items));
