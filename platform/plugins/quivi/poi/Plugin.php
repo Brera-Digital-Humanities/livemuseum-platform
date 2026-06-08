@@ -77,6 +77,12 @@ class Plugin extends PluginBase
                         'icon'        => 'icon-bookmark',
                         'permissions' => ['quivi.poi.bookmarks'],
                     ],
+                    'commentlikes' => [
+                        'label'       => 'Like commenti',
+                        'url'         => Backend::url('quivi/poi/commentlikes'),
+                        'icon'        => 'icon-thumbs-up',
+                        'permissions' => ['quivi.poi.commentlikes'],
+                    ],
                 ],
             ],
         ];
@@ -100,6 +106,10 @@ class Plugin extends PluginBase
             'quivi.poi.bookmarks' => [
                 'tab'   => 'LiveMuseum',
                 'label' => 'Visualizzazione bookmark',
+            ],
+            'quivi.poi.commentlikes' => [
+                'tab'   => 'LiveMuseum',
+                'label' => 'Visualizzazione like commenti',
             ],
         ];
     }

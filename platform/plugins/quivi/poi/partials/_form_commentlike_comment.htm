@@ -1,0 +1,10 @@
+<?php
+$id  = $model->comment_id;
+$url = Backend::url('quivi/poi/comments/update/' . $id);
+?>
+<div class="form-group">
+    <label class="control-label">Commento</label>
+    <div>
+        <a href="<?= $url ?>" class="btn btn-default">Apri commento #<?= (int) $id ?></a>
+    </div>
+</div>

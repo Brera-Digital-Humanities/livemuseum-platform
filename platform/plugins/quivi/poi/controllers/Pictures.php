@@ -18,4 +18,19 @@ class Pictures extends Controller
         parent::__construct();
         BackendMenu::setContext('Quivi.Poi', 'poi', 'pictures');
     }
+
+    public function update($recordId = null)
+    {
+        $this->asExtension('FormController')->update($recordId);
+    }
+
+    public function update_onSave($recordId = null)
+    {
+        return $this->asExtension('FormController')->update_onSave($recordId);
+    }
+
+    public function update_onDelete($recordId = null)
+    {
+        return $this->asExtension('FormController')->update_onDelete($recordId);
+    }
 }

@@ -627,6 +627,15 @@ curl "http://localhost:8091/api/v1/pois/all" \
                 </tbody>
             </table>
 
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/comments/{id}/likes</span></h3>
+            <p>Restituisce il conteggio like del commento e se l'utente corrente ha già messo like.</p>
+            <pre><code>{
+  "comment_id": 1,
+  "likes_num": 5,
+  "liked": false,
+  "users": [{ "id": 2, "username": "...", "avatar": "..." }]
+}</code></pre>
+
             <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/like</span></h3>
             <p>Aggiunge un like al commento per l'utente corrente. <code>DELETE</code> sullo stesso path rimuove il like. Risponde con <code>liked</code> e <code>likes_num</code>.</p>
 

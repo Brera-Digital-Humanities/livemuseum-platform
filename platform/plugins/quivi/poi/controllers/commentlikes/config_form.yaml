@@ -1,0 +1,8 @@
+name: Like
+form: $/quivi/poi/models/commentlike/fields.yaml
+modelClass: Quivi\Poi\Models\CommentLike
+
+update:
+    title: Dettaglio like
+
+flashSave: Like salvato.

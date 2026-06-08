@@ -1,0 +1,16 @@
+columns:
+    id:
+        label: ID
+        sortable: true
+    comment_id:
+        label: Commento
+        type: partial
+        path: $/quivi/poi/partials/_commentlike_comment.htm
+    user_id:
+        label: Utente
+        type: partial
+        path: $/quivi/poi/partials/_comment_user.htm
+    created_at:
+        label: Data
+        type: datetime
+        sortable: true

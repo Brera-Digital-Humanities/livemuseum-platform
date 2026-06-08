@@ -1,0 +1,5 @@
+<?php
+$id  = $record->comment_id;
+$url = Backend::url('quivi/poi/comments/update/' . $id);
+?>
+<a href="<?= $url ?>" class="btn btn-xs btn-default">Commento #<?= (int) $id ?></a>

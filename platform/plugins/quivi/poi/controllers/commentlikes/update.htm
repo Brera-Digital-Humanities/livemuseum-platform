@@ -1,0 +1,5 @@
+<?php if (!empty($fatalError)): ?>
+    <p class="flash-message static error"><?= e($fatalError) ?></p>
+<?php else: ?>
+    <?= $this->formRender() ?>
+<?php endif ?>

@@ -2765,6 +2765,26 @@ Route::group(['prefix' => 'api/v1/comments'], function () {
         return Response::json(lmCommentResponse($row), 201);
     });
 
+    Route::get('{id}/likes', function (Request $request, $id) {
+        $commentId = (int) $id;
+        if ($commentId <= 0) {
+            return Response::json(['error' => 'Comment not found.'], 404);
+        }
+        $currentUserId = lmMockCurrentUserId($request);
+        $likesNum = lmCommentLikesNum($commentId);
+        $liked = Db::table('quivi_poi_comment_likes')
+            ->where('comment_id', $commentId)
+            ->where('user_id', $currentUserId)
+            ->exists();
+        $users = lmEngagementUsers('quivi_poi_comment_likes', ['comment_id' => $commentId], []);
+        return Response::json([
+            'comment_id' => $commentId,
+            'likes_num'  => $likesNum,
+            'liked'      => $liked,
+            'users'      => $users,
+        ]);
+    });
+
     Route::post('{id}/like', function (Request $request, $id) {
         return lmSetCommentLike($request, $id, true);
     });

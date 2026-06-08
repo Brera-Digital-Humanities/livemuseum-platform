@@ -1,0 +1,10 @@
+list: $/quivi/poi/models/commentlike/columns.yaml
+
+modelClass: Quivi\Poi\Models\CommentLike
+title: Like ai commenti
+recordUrl: quivi/poi/commentlikes/update/:id
+recordsPerPage: 50
+
+toolbar:
+    search:
+        prompt: Cerca...
