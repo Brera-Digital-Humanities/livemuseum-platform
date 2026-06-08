@@ -33,7 +33,9 @@ services:
       - PMA_HOST=dblm
       - PMA_USER=root
       - PMA_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - UPLOAD_LIMIT=256M
+      - UPLOAD_LIMIT=999G
+      - PMA_MAX_POST_SIZE=999G
+      - PMA_MEMORY_LIMIT=999G
       - TZ=${TZ}
     ports:
       - "8087:80"
