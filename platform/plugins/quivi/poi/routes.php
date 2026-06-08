@@ -861,9 +861,68 @@ function lmPoiBookmarksNum($poiId, $base)
     ]);
 }
 
-function lmCommentLikesNum($commentId, $base)
+function lmCommentTableExists()
+{
+    static $exists = null;
+    if ($exists === null) {
+        $exists = Schema::hasTable('quivi_poi_comments');
+    }
+    return $exists;
+}
+
+function lmCommentLikesNum($commentId, $base = 0)
 {
     return (int) $base + lmEngagementCount('quivi_poi_comment_likes', ['comment_id' => (int) $commentId]);
+}
+
+function lmCommentResponse($row)
+{
+    $likesNum = lmCommentLikesNum((int) $row->id);
+    return [
+        'id'           => (int) $row->id,
+        'parent_id'    => $row->parent_id ? (int) $row->parent_id : null,
+        'target_type'  => $row->target_type,
+        'target_id'    => (int) $row->target_id,
+        'user'         => lmMockUser((int) $row->user_id),
+        'comment_text' => $row->comment_text,
+        'comment_date' => $row->created_at,
+        'likes_num'    => $likesNum,
+        'likes'        => ['users' => lmEngagementUsers('quivi_poi_comment_likes', ['comment_id' => (int) $row->id], [])],
+        'comments_num' => (int) Db::table('quivi_poi_comments')->where('parent_id', $row->id)->whereNull('deleted_at')->count(),
+        'comments'     => [],
+    ];
+}
+
+function lmStoredComments($targetType, $targetId, $parentId = null)
+{
+    if (!lmCommentTableExists()) {
+        return [];
+    }
+
+    $q = Db::table('quivi_poi_comments')
+        ->where('target_type', $targetType)
+        ->where('target_id', (int) $targetId)
+        ->whereNull('deleted_at')
+        ->orderBy('created_at');
+
+    if ($parentId === null) {
+        $q->whereNull('parent_id');
+    } else {
+        $q->where('parent_id', (int) $parentId);
+    }
+
+    $rows = $q->get();
+    $comments = [];
+
+    foreach ($rows as $row) {
+        $comment = lmCommentResponse($row);
+        $replies = lmStoredComments($targetType, $targetId, $row->id);
+        $comment['comments'] = $replies;
+        $comment['comments_num'] = count($replies);
+        $comments[] = $comment;
+    }
+
+    return $comments;
 }
 
 function lmCommentsWithEngagement(array $comments)
@@ -2658,26 +2717,40 @@ Route::group(['prefix' => 'api/v1/pictures'], function () {
 });
 
 Route::group(['prefix' => 'api/v1/comments'], function () {
-    Route::post('{id}/create', function (Request $request, $id) {
+    // POST /comments/{targetId}/create — {targetId} is poi or picture id
+    Route::post('{targetId}/create', function (Request $request, $targetId) {
         $validator = Validator::make($request->all(), [
             'comment_text' => 'required|string|between:1,1000',
+            'target_type'  => 'nullable|string|in:poi,picture',
+            'parent_id'    => 'nullable|integer|min:1',
         ]);
 
         if ($validator->fails()) {
             return Response::json(['errors' => $validator->errors()], 422);
         }
 
-        return Response::json([
-            'id' => 900,
-            'parent_id' => (int) $id,
-            'user' => lmMockUser(lmMockCurrentUserId($request)),
+        $userId     = lmMockCurrentUserId($request);
+        $targetType = $request->input('target_type', 'poi');
+        $parentId   = $request->input('parent_id') ? (int) $request->input('parent_id') : null;
+        $now        = date('Y-m-d H:i:s');
+
+        if (!lmCommentTableExists()) {
+            return Response::json(['error' => 'Comments storage is not available.'], 500);
+        }
+
+        $id = Db::table('quivi_poi_comments')->insertGetId([
+            'target_type'  => $targetType,
+            'target_id'    => (int) $targetId,
+            'parent_id'    => $parentId,
+            'user_id'      => $userId,
             'comment_text' => $request->input('comment_text'),
-            'comment_date' => date('c'),
-            'likes_num' => 0,
-            'likes' => ['users' => []],
-            'comments_num' => 0,
-            'comments' => [],
-        ], 201);
+            'created_at'   => $now,
+            'updated_at'   => $now,
+        ]);
+
+        $row = Db::table('quivi_poi_comments')->where('id', $id)->first();
+
+        return Response::json(lmCommentResponse($row), 201);
     });
 
     Route::post('{id}/like', function (Request $request, $id) {
@@ -2689,11 +2762,26 @@ Route::group(['prefix' => 'api/v1/comments'], function () {
     });
 
     Route::delete('{id}/delete', function (Request $request, $id) {
-        $ownerUserId = (int) $request->input('owner_user_id', 1);
+        if (!lmCommentTableExists()) {
+            return Response::json(['error' => 'Comments storage is not available.'], 500);
+        }
 
-        if ($ownerUserId !== lmMockCurrentUserId($request)) {
+        $comment = Db::table('quivi_poi_comments')
+            ->where('id', (int) $id)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$comment) {
+            return Response::json(['error' => 'Comment not found.'], 404);
+        }
+
+        if ((int) $comment->user_id !== lmMockCurrentUserId($request)) {
             return Response::json(['error' => 'Forbidden.'], 403);
         }
+
+        Db::table('quivi_poi_comments')
+            ->where('id', (int) $id)
+            ->update(['deleted_at' => date('Y-m-d H:i:s')]);
 
         return Response::json(['success' => true, 'id' => (int) $id]);
     });
@@ -2701,29 +2789,36 @@ Route::group(['prefix' => 'api/v1/comments'], function () {
     Route::match(['put', 'patch'], '{id}/update', function (Request $request, $id) {
         $validator = Validator::make($request->all(), [
             'comment_text' => 'required|string|between:1,1000',
-            'owner_user_id' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
             return Response::json(['errors' => $validator->errors()], 422);
         }
 
-        $ownerUserId = (int) $request->input('owner_user_id', 1);
+        if (!lmCommentTableExists()) {
+            return Response::json(['error' => 'Comments storage is not available.'], 500);
+        }
 
-        if ($ownerUserId !== lmMockCurrentUserId($request)) {
+        $comment = Db::table('quivi_poi_comments')
+            ->where('id', (int) $id)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$comment) {
+            return Response::json(['error' => 'Comment not found.'], 404);
+        }
+
+        if ((int) $comment->user_id !== lmMockCurrentUserId($request)) {
             return Response::json(['error' => 'Forbidden.'], 403);
         }
 
-        return Response::json([
-            'id' => (int) $id,
-            'user' => lmMockUser($ownerUserId),
-            'comment_text' => $request->input('comment_text'),
-            'comment_date' => date('c'),
-            'likes_num' => 0,
-            'likes' => ['users' => []],
-            'comments_num' => 0,
-            'comments' => [],
-        ]);
+        Db::table('quivi_poi_comments')
+            ->where('id', (int) $id)
+            ->update(['comment_text' => $request->input('comment_text'), 'updated_at' => date('Y-m-d H:i:s')]);
+
+        $row = Db::table('quivi_poi_comments')->where('id', (int) $id)->first();
+
+        return Response::json(lmCommentResponse($row));
     });
 });
 

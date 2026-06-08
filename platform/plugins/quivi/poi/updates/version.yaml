@@ -27,3 +27,6 @@
 1.0.10:
     - 'Add source_url and license fields to POIs'
     - poi_source_url_license.php
+1.0.11:
+    - 'Add comments table'
+    - comments_schema.php
