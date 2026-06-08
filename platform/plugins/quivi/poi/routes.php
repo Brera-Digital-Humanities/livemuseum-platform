@@ -231,6 +231,8 @@ function lmPoiSelectedColumns($includeRaw = false)
         'phone',
         'email',
         'website',
+        'source_url',
+        'license',
         'opening_hours',
         'tickets_info',
         'booking_info',
@@ -1386,6 +1388,8 @@ function lmPoiResponse($row, array $options = [])
         'opening_hours' => $opening['opening_hours'],
         'tickets_info' => lmPoiText($row->tickets_info ?? null, 'Informazioni biglietti non disponibili.'),
         'booking_info' => lmPoiText($row->booking_info ?? null, 'Informazioni prenotazione non disponibili.'),
+        'source_url' => lmPoiText($row->source_url ?? null),
+        'license' => lmPoiText($row->license ?? null),
         'source' => lmPoiText($row->source ?? null),
         'source_file' => lmPoiText($row->source_file ?? null),
     ];
@@ -2084,6 +2088,8 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             'booking_info' => 'nullable|string',
             'schedaType' => 'nullable|string|in:base,unlockable,livemuseum,community',
             'scheda_type' => 'nullable|string|in:base,unlockable,livemuseum,community',
+            'source_url' => 'nullable|url|max:512',
+            'license' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -2095,6 +2101,17 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         $title = $request->input('title', $request->input('name'));
         $categoryName = lmPoiCategoryNameFromInput($request->input('category'));
         $schedaType = lmPoiSchedaType($request->input('schedaType', $request->input('scheda_type', 'base')));
+        $dedupeKey = sha1(strtolower($title) . '|' . $lat . '|' . $lng . '|' . strtolower((string) $request->input('city')));
+
+        $existing = Db::table('quivi_poi_pois')
+            ->where('dedupe_key', $dedupeKey)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($existing) {
+            return Response::json(['status' => 'DUPLICATE', 'id' => (int) $existing->id, 'poi' => lmMockPoi($existing->id)], 200);
+        }
+
         $slug = lmPoiUniqueSlug($title);
         $now = date('Y-m-d H:i:s');
         $rawData = $request->all();
@@ -2121,12 +2138,14 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             'phone' => lmPoiText($request->input('phone')),
             'email' => lmPoiText($request->input('email')),
             'website' => lmPoiText($request->input('website')),
+            'source_url' => lmPoiText($request->input('source_url')),
+            'license' => lmPoiText($request->input('license')),
             'opening_hours' => null,
             'tickets_info' => lmPoiText($request->input('tickets_info')),
             'booking_info' => lmPoiText($request->input('booking_info')),
             'source' => 'App',
             'source_file' => 'api/v1/pois/create',
-            'dedupe_key' => sha1(strtolower($title) . '|' . $lat . '|' . $lng . '|' . strtolower((string) $request->input('city'))),
+            'dedupe_key' => $dedupeKey,
             'raw_data' => json_encode($rawData, JSON_UNESCAPED_SLASHES),
             'created_at' => $now,
             'updated_at' => $now,

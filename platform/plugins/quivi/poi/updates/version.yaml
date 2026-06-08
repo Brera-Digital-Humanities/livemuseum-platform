@@ -24,3 +24,6 @@
 1.0.9:
     - 'Add performance indexes on deleted_at and filter columns'
     - poi_performance_indexes.php
+1.0.10:
+    - 'Add source_url and license fields to POIs'
+    - poi_source_url_license.php

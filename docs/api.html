@@ -491,7 +491,16 @@ curl "http://localhost:8091/api/v1/pois/all" \
 }</code></pre>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/create</span></h3>
-            <p>Crea un nuovo POI nella tabella reale. Campi principali: <code>lat</code>, <code>lng</code>, <code>title</code>, <code>category</code>, <code>descr</code>, <code>image_url</code>. <code>schedaType</code> e opzionale e defaulta a <code>base</code>. Per compatibilita accetta ancora <code>lon</code>, <code>name</code> e <code>picture</code>. Risponde <code>{"status":"OK","id":...}</code> o <code>{"status":"KO"}</code>.</p>
+            <p>Crea un nuovo POI. Campi principali: <code>lat</code>, <code>lng</code>, <code>title</code>, <code>category</code>, <code>descr</code>, <code>image_url</code>. Accetta anche <code>source_url</code> (URL Wikipedia / istituzionale, max 512 char) e <code>license</code> (es. <code>CC BY-SA 4.0</code>). <code>schedaType</code> opzionale, default <code>base</code>. Per compatibilita accetta <code>lon</code>, <code>name</code>, <code>picture</code>.</p>
+            <p>Il server calcola un <code>dedupe_key</code> da titolo, coordinate e citta. Se un POI con la stessa chiave esiste gia, non viene creato un duplicato.</p>
+            <table>
+                <thead><tr><th>Status risposta</th><th>HTTP</th><th>Significato</th></tr></thead>
+                <tbody>
+                    <tr><td><code>OK</code></td><td>201</td><td>POI creato. Body: <code>{"status":"OK","id":…,"poi":{…}}</code></td></tr>
+                    <tr><td><code>DUPLICATE</code></td><td>200</td><td>POI gia esistente. Body: <code>{"status":"DUPLICATE","id":…,"poi":{…}}</code></td></tr>
+                    <tr><td><code>KO</code></td><td>422</td><td>Validazione fallita. Body: <code>{"status":"KO","errors":{…}}</code></td></tr>
+                </tbody>
+            </table>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/{id|slug}/view</span></h3>
             <p>Dettaglio POI richiamabile con id numerico, ad esempio <code>1</code>, oppure slug, ad esempio <code>amiternum</code>. Include i campi stile <code>culturalSites</code>, <code>pictures</code>, contatori, <code>days_open</code>, <code>hours_open</code>, <code>tickets_info</code> e <code>booking_info</code>.</p>
