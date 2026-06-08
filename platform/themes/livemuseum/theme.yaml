@@ -1,0 +1,9 @@
+name: LiveMuseum
+description: ''
+author: 'Gionatan Quintini'
+homepage: 'https://livemuseum.it'
+code: winter-cms
+form:
+    fields:
+        googleanalytics_id:
+            label: 'Google Analytics ID'
