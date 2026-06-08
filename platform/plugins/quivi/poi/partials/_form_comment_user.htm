@@ -1,0 +1,17 @@
+<?php
+$user = $model->user;
+$name = $user ? trim($user->name . ' ' . $user->surname) : 'Utente #' . $model->user_id;
+$url  = $user ? Backend::url('winter/user/users/update/' . $user->id) : null;
+?>
+<div class="form-group">
+    <label class="control-label">Utente</label>
+    <div>
+        <?php if ($url): ?>
+            <a href="<?= $url ?>" class="btn btn-default"><?= e($name) ?></a>
+        <?php elseif ($model->user_id): ?>
+            <span class="text-muted"><?= e($name) ?></span>
+        <?php else: ?>
+            <span class="text-muted">—</span>
+        <?php endif ?>
+    </div>
+</div>

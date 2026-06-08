@@ -66,7 +66,7 @@ class Plugin extends PluginBase
                         'permissions' => ['quivi.poi.pictures'],
                     ],
                     'comments' => [
-                        'label'       => 'Commenti',
+                        'label'       => 'Commenti e Reviews',
                         'url'         => Backend::url('quivi/poi/comments'),
                         'icon'        => 'icon-comment',
                         'permissions' => ['quivi.poi.comments'],

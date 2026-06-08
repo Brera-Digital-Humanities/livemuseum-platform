@@ -30,3 +30,6 @@
 1.0.11:
     - 'Add comments table'
     - comments_schema.php
+1.0.12:
+    - 'Add kind and rating fields to comments'
+    - comments_add_kind_rating.php

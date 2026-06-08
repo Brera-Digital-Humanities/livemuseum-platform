@@ -9,9 +9,31 @@ fields:
     user_id:
         label: Utente ID
         span: left
+        hidden: true
+    user_button:
+        label: ''
+        type: partial
+        path: $/quivi/poi/partials/_form_comment_user.htm
+        span: left
     parent_id:
         label: Risposta a (ID commento)
         span: right
+        trigger:
+            action: show
+            field: kind
+            condition: value[comment]
+    kind:
+        label: Tipo
+        type: dropdown
+        span: left
+    rating:
+        label: Rating (1-5)
+        type: number
+        span: right
+        trigger:
+            action: show
+            field: kind
+            condition: value[review]
     comment_text:
         label: Testo commento
         type: textarea

@@ -611,11 +611,21 @@ curl "http://localhost:8091/api/v1/pois/all" \
         </section>
 
         <section>
-            <h2>Comments</h2>
-            <p>Ogni commento contiene <code>id</code>, <code>user</code>, <code>comment_text</code>, <code>comment_date</code>, <code>likes_num</code>, <code>likes</code>, <code>comments_num</code> e <code>comments</code> per le risposte.</p>
+            <h2>Comments &amp; Reviews</h2>
+            <p>Commenti e recensioni condividono la stessa entità. Il campo <code>kind</code> discrimina il tipo: <code>comment</code> (default) o <code>review</code>. Le recensioni accettano un campo opzionale <code>rating</code> (intero 1–5). Ogni record contiene <code>id</code>, <code>kind</code>, <code>user</code>, <code>comment_text</code>, <code>rating</code>, <code>comment_date</code>, <code>likes_num</code>, <code>likes</code>, <code>comments_num</code> e <code>comments</code> per le risposte.</p>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/create</span></h3>
-            <p>Crea un commento o una risposta sul target indicato da <code>{id}</code>. Campo richiesto: <code>comment_text</code>.</p>
+            <p>Crea un commento o una recensione sul target indicato da <code>{id}</code> (<code>target_type</code>: <code>poi</code> o <code>picture</code>, default <code>poi</code>). Per le risposte passare <code>parent_id</code>. Il campo <code>rating</code> è accettato solo se <code>kind=review</code>.</p>
+            <table>
+                <thead><tr><th>Campo body</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>comment_text</code></td><td>Sì</td><td>Testo, 1–1000 caratteri.</td></tr>
+                    <tr><td><code>kind</code></td><td>No</td><td><code>comment</code> (default) o <code>review</code>.</td></tr>
+                    <tr><td><code>rating</code></td><td>No</td><td>Intero 1–5. Ignorato se <code>kind</code> non è <code>review</code>.</td></tr>
+                    <tr><td><code>target_type</code></td><td>No</td><td><code>poi</code> (default) o <code>picture</code>.</td></tr>
+                    <tr><td><code>parent_id</code></td><td>No</td><td>ID del commento padre per le risposte.</td></tr>
+                </tbody>
+            </table>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/like</span></h3>
             <p>Aggiunge un like al commento per l'utente corrente. <code>DELETE</code> sullo stesso path rimuove il like. Risponde con <code>liked</code> e <code>likes_num</code>.</p>

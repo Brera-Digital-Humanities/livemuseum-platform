@@ -24,4 +24,9 @@ class Comment extends Model
     {
         return ['poi' => 'POI', 'picture' => 'Foto'];
     }
+
+    public function getKindOptions()
+    {
+        return ['comment' => 'Commento', 'review' => 'Recensione'];
+    }
 }

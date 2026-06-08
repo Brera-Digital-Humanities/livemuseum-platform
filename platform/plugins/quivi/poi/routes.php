@@ -878,13 +878,16 @@ function lmCommentLikesNum($commentId, $base = 0)
 function lmCommentResponse($row)
 {
     $likesNum = lmCommentLikesNum((int) $row->id);
+    $rating   = isset($row->rating) && $row->rating !== null ? (int) $row->rating : null;
     return [
         'id'           => (int) $row->id,
+        'kind'         => $row->kind ?? 'comment',
         'parent_id'    => $row->parent_id ? (int) $row->parent_id : null,
         'target_type'  => $row->target_type,
         'target_id'    => (int) $row->target_id,
         'user'         => lmMockUser((int) $row->user_id),
         'comment_text' => $row->comment_text,
+        'rating'       => $rating,
         'comment_date' => $row->created_at,
         'likes_num'    => $likesNum,
         'likes'        => ['users' => lmEngagementUsers('quivi_poi_comment_likes', ['comment_id' => (int) $row->id], [])],
@@ -2723,6 +2726,8 @@ Route::group(['prefix' => 'api/v1/comments'], function () {
             'comment_text' => 'required|string|between:1,1000',
             'target_type'  => 'nullable|string|in:poi,picture',
             'parent_id'    => 'nullable|integer|min:1',
+            'kind'         => 'nullable|string|in:comment,review',
+            'rating'       => 'nullable|integer|min:1|max:5',
         ]);
 
         if ($validator->fails()) {
@@ -2738,12 +2743,19 @@ Route::group(['prefix' => 'api/v1/comments'], function () {
             return Response::json(['error' => 'Comments storage is not available.'], 500);
         }
 
+        $kind   = $request->input('kind', 'comment');
+        $rating = ($kind === 'review' && $request->filled('rating'))
+            ? (int) $request->input('rating')
+            : null;
+
         $id = Db::table('quivi_poi_comments')->insertGetId([
             'target_type'  => $targetType,
             'target_id'    => (int) $targetId,
             'parent_id'    => $parentId,
             'user_id'      => $userId,
             'comment_text' => $request->input('comment_text'),
+            'kind'         => $kind,
+            'rating'       => $rating,
             'created_at'   => $now,
             'updated_at'   => $now,
         ]);

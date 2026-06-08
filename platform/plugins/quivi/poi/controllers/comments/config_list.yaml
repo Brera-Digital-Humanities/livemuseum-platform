@@ -18,3 +18,10 @@ filter:
             options:
                 poi: POI
                 picture: Foto
+        kind:
+            label: Tipologia
+            type: group
+            conditions: kind in (:filtered)
+            options:
+                comment: Commento
+                review: Recensione

@@ -3,7 +3,7 @@ columns:
         label: ID
         sortable: true
     target_type:
-        label: Target
+        label: ID Target
     target_id:
         label: Target
         type: partial
@@ -12,6 +12,10 @@ columns:
         label: Utente
         type: partial
         path: $/quivi/poi/partials/_comment_user.htm
+    kind:
+        label: Tipo
+    rating:
+        label: Rating
     comment_text:
         label: Testo
         searchable: true
