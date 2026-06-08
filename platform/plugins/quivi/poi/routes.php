@@ -1582,6 +1582,45 @@ function lmApplyPoiFilters($query, Request $request)
     return $query;
 }
 
+function lmParseBbox($bbox)
+{
+    $parts = array_map('floatval', explode(',', (string) $bbox));
+    if (count($parts) !== 4) {
+        return null;
+    }
+    [$south, $west, $north, $east] = $parts;
+    if ($south >= $north || $west >= $east) {
+        return null;
+    }
+    return compact('south', 'west', 'north', 'east');
+}
+
+function lmZoomCellDeg(int $zoom): float
+{
+    $map = [
+        1 => 20.0, 2 => 15.0, 3 => 10.0, 4 => 8.0,
+        5 => 5.0,  6 => 3.0,  7 => 2.0,  8 => 1.0,
+        9 => 0.5, 10 => 0.25, 11 => 0.1, 12 => 0.05,
+        13 => 0.025, 14 => 0.01,
+    ];
+    return $map[max(1, min($zoom, 14))] ?? 0.01;
+}
+
+function lmBboxPoisQuery(array $bbox, Request $request = null)
+{
+    $q = lmPoiBaseQuery(false)
+        ->whereNotNull('lat')
+        ->whereNotNull('lng')
+        ->whereBetween('lat', [$bbox['south'], $bbox['north']])
+        ->whereBetween('lng', [$bbox['west'], $bbox['east']]);
+
+    if ($request) {
+        lmApplyPoiFilters($q, $request);
+    }
+
+    return $q;
+}
+
 function lmNearbyPois($lat, $lng, $limit = 100, Request $request = null)
 {
     $lat = (float) $lat;
@@ -1991,10 +2030,13 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
     });
 
     Route::get('list', function (Request $request) {
+        $hasBbox = $request->filled('bbox');
+
         $validator = Validator::make($request->all(), [
-            'lat'        => 'required|numeric',
-            'lng'        => 'required_without:lon|numeric',
-            'lon'        => 'required_without:lng|numeric',
+            'lat'        => ($hasBbox ? 'nullable' : 'required') . '|numeric',
+            'lng'        => ($hasBbox ? 'nullable' : 'required_without:lon') . '|numeric',
+            'lon'        => ($hasBbox ? 'nullable' : 'required_without:lng') . '|numeric',
+            'bbox'       => 'nullable|string',
             'limit'      => 'nullable|integer|min:1|max:500',
             'category'   => 'nullable|string',
             'schedaType' => 'nullable|string|in:base,unlockable,livemuseum,community',
@@ -2008,6 +2050,26 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             return Response::json(['errors' => $validator->errors()], 422);
         }
 
+        if ($hasBbox) {
+            $bbox = lmParseBbox($request->input('bbox'));
+            if (!$bbox) {
+                return Response::json(['error' => 'Invalid bbox. Expected: south,west,north,east'], 422);
+            }
+
+            $limit = lmPoiLimit($request, 100, 500);
+            $centerLat = ($bbox['south'] + $bbox['north']) / 2;
+            $centerLng = ($bbox['west'] + $bbox['east']) / 2;
+            $distanceSql = 'ROUND(6371000 * ACOS(LEAST(1, GREATEST(-1, COS(RADIANS(' . $centerLat . ')) * COS(RADIANS(lat)) * COS(RADIANS(lng) - RADIANS(' . $centerLng . ')) + SIN(RADIANS(' . $centerLat . ')) * SIN(RADIANS(lat)))))) AS distance';
+
+            $rows = lmBboxPoisQuery($bbox, $request)
+                ->addSelect(Db::raw($distanceSql))
+                ->orderBy('distance')
+                ->limit($limit)
+                ->get();
+
+            return Response::json(['data' => lmPoiResponses($rows, ['related' => 'compact'])]);
+        }
+
         $lng = $request->input('lng', $request->input('lon'));
 
         return Response::json([
@@ -2017,6 +2079,103 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
     Route::get('categories', function () {
         return Response::json(['data' => lmPoiCategories()]);
+    });
+
+    Route::get('cluster', function (Request $request) {
+        $validator = Validator::make($request->all(), [
+            'bbox' => 'required|string',
+            'zoom' => 'required|integer|min:1|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        $bbox = lmParseBbox($request->input('bbox'));
+        if (!$bbox) {
+            return Response::json(['error' => 'Invalid bbox. Expected: south,west,north,east'], 422);
+        }
+
+        $zoom    = (int) $request->input('zoom');
+        $cellDeg = lmZoomCellDeg($zoom);
+
+        $baseQuery = lmBboxPoisQuery($bbox, $request);
+        $totalPois = (int) (clone $baseQuery)->count();
+
+        if ($zoom >= 15) {
+            $rows  = $baseQuery->orderBy('id')->limit(500)->get();
+            $items = array_map(function ($row) {
+                return [
+                    'lat'       => (float) $row->lat,
+                    'lng'       => (float) $row->lng,
+                    'count'     => 1,
+                    'id'        => (int) $row->id,
+                    'slug'      => $row->slug,
+                    'title'     => $row->title,
+                    'type'      => $row->type,
+                    'image_url' => $row->image_url,
+                ];
+            }, $baseQuery->orderBy('id')->limit(500)->get()->all());
+
+            return Response::json([
+                'data' => $items,
+                'meta' => ['total_pois' => $totalPois, 'zoom' => $zoom, 'cell_deg' => null],
+            ]);
+        }
+
+        $cellSql = (string) $cellDeg;
+        $clusters = $baseQuery
+            ->select([
+                Db::raw('AVG(lat) AS lat'),
+                Db::raw('AVG(lng) AS lng'),
+                Db::raw('COUNT(*) AS cnt'),
+                Db::raw('MIN(id) AS rep_id'),
+                Db::raw('ROUND(lat / ' . $cellSql . ') * ' . $cellSql . ' AS cell_lat'),
+                Db::raw('ROUND(lng / ' . $cellSql . ') * ' . $cellSql . ' AS cell_lng'),
+            ])
+            ->groupBy('cell_lat', 'cell_lng')
+            ->orderByRaw('cnt DESC')
+            ->limit(500)
+            ->get();
+
+        $repIds   = $clusters->where('cnt', 1)->pluck('rep_id')->filter()->values()->toArray();
+        $repPois  = [];
+        if ($repIds) {
+            $repPois = Db::table('quivi_poi_pois')
+                ->select(['id', 'slug', 'title', 'type', 'image_url'])
+                ->whereIn('id', $repIds)
+                ->get()
+                ->keyBy('id');
+        }
+
+        $items = $clusters->map(function ($cluster) use ($repPois) {
+            $item = [
+                'lat'   => round((float) $cluster->lat, 6),
+                'lng'   => round((float) $cluster->lng, 6),
+                'count' => (int) $cluster->cnt,
+                'id'        => null,
+                'slug'      => null,
+                'title'     => null,
+                'type'      => null,
+                'image_url' => null,
+            ];
+
+            if ((int) $cluster->cnt === 1 && isset($repPois[$cluster->rep_id])) {
+                $poi = $repPois[$cluster->rep_id];
+                $item['id']        = (int) $poi->id;
+                $item['slug']      = $poi->slug;
+                $item['title']     = $poi->title;
+                $item['type']      = $poi->type;
+                $item['image_url'] = $poi->image_url;
+            }
+
+            return $item;
+        })->values()->all();
+
+        return Response::json([
+            'data' => $items,
+            'meta' => ['total_pois' => $totalPois, 'zoom' => $zoom, 'cell_deg' => $cellDeg],
+        ]);
     });
 
     Route::get('search', function (Request $request) {

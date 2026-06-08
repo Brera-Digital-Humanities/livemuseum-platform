@@ -368,12 +368,13 @@
             <p>Rotte POI basate sui dati reali importati in <code>quivi_poi_pois</code>. I bookmark sostituiscono il concetto precedente di saved. Ogni POI mantiene lo stile del servizio <code>/api/culturalSites</code> con <code>id_opendata</code>, <code>type</code>, <code>title</code>, indirizzo, coordinate <code>lat</code>/<code>lng</code>, <code>image_url</code>, <code>services</code> e <code>schedaType</code>. <code>schedaType</code> e un enum: <code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>. Per i dati non ancora modellati, come social, immagini utente e alcuni dettagli di apertura, restano fallback provvisori. Ogni POI contiene <code>id</code> e <code>slug</code>; il dettaglio accetta entrambi.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/list?lat=45.4642&amp;lng=9.1900</span></h3>
-            <p>Restituisce POI reali vicini alle coordinate inviate, ordinati per distanza. Il default e 100 risultati; <code>limit</code> accetta valori da 1 a 500.</p>
+            <p>Restituisce POI reali vicini alle coordinate inviate, ordinati per distanza. Accetta anche <code>bbox</code> come alternativa a <code>lat/lng</code> per query viewport. Il default e 100 risultati; <code>limit</code> accetta valori da 1 a 500.</p>
             <table>
                 <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
                 <tbody>
-                    <tr><td><code>lat</code></td><td>Si</td><td>Latitudine.</td></tr>
-                    <tr><td><code>lng</code> / <code>lon</code></td><td>Si</td><td>Longitudine.</td></tr>
+                    <tr><td><code>lat</code></td><td>Si *</td><td>Latitudine. Non richiesto se si usa <code>bbox</code>.</td></tr>
+                    <tr><td><code>lng</code> / <code>lon</code></td><td>Si *</td><td>Longitudine. Non richiesto se si usa <code>bbox</code>.</td></tr>
+                    <tr><td><code>bbox</code></td><td>Si *</td><td>Viewport: <code>south,west,north,east</code> (es. <code>41.8,12.3,42.1,12.7</code>). Alternativo a <code>lat/lng</code>.</td></tr>
                     <tr><td><code>limit</code></td><td>No</td><td>Numero risultati. Default 100, max 500.</td></tr>
                     <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria (es. <code>Chiesa</code>, <code>Museo</code>). Valori disponibili da <code>/pois/categories</code>.</td></tr>
                     <tr><td><code>schedaType</code></td><td>No</td><td>Filtra per tipo scheda: <code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>.</td></tr>
@@ -382,6 +383,25 @@
                     <tr><td><code>location</code></td><td>No</td><td>Filtra per comune, provincia o regione (es. <code>Milano</code>, <code>Lombardia</code>).</td></tr>
                 </tbody>
             </table>
+
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/cluster?bbox=36,6.5,47.5,18.5&amp;zoom=7</span></h3>
+            <p>Clustering server-side per mappa. Raggruppa i POI in una griglia la cui dimensione dipende dal livello di zoom. A zoom ≥ 15 restituisce POI singoli (cap 500). I cluster con <code>count=1</code> includono <code>id</code>, <code>slug</code>, <code>title</code>, <code>type</code> e <code>image_url</code> del POI. <code>meta.total_pois</code> indica quanti POI totali ricadono nel bbox prima del clustering.</p>
+            <table>
+                <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>bbox</code></td><td>Si</td><td>Viewport: <code>south,west,north,east</code>.</td></tr>
+                    <tr><td><code>zoom</code></td><td>Si</td><td>Livello zoom mappa (1–20). Determina la dimensione della cella di clustering.</td></tr>
+                    <tr><td><code>type</code>, <code>services</code>, <code>location</code>, <code>category</code></td><td>No</td><td>Stessi filtri di <code>pois/list</code>.</td></tr>
+                </tbody>
+            </table>
+            <pre><code>curl "http://localhost:8091/api/v1/pois/cluster?bbox=41.85,12.4,42.0,12.6&zoom=10"</code></pre>
+            <pre><code>{
+  "data": [
+    { "lat": 41.967, "lng": 12.593, "count": 142, "id": null, "slug": null, "title": null, "type": null, "image_url": null },
+    { "lat": 41.902, "lng": 12.451, "count": 1, "id": 1234, "slug": "cappella-di-test", "title": "Cappella di Test", "type": "cappella", "image_url": null }
+  ],
+  "meta": { "total_pois": 1739, "zoom": 10, "cell_deg": 0.25 }
+}</code></pre>
             <pre><code>{
   "data": [{
     "id": 47954,
