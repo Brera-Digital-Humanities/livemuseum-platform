@@ -2033,13 +2033,17 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             return Response::json(['errors' => $validator->errors()], 422);
         }
 
-        $q = (string) $request->input('q', '');
+        $q = trim((string) $request->input('q', ''));
         ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
 
-        $total       = (int) lmSearchPoisQuery($q, $request)->count();
-        $filtersMeta = lmPoiQueryMeta(lmSearchPoisQuery($q, $request));
+        $baseQuery = $q !== ''
+            ? fn() => lmSearchPoisQuery($q, $request)
+            : fn() => lmApplyPoiFilters(lmPoiBaseQuery(false), $request);
+
+        $total       = (int) $baseQuery()->count();
+        $filtersMeta = lmPoiQueryMeta($baseQuery());
         $items       = lmPoiResponses(
-            lmSearchPoisQuery($q, $request)->orderBy('title')->limit($perPage)->offset($offset)->get(),
+            $baseQuery()->orderBy('title')->limit($perPage)->offset($offset)->get(),
             ['related' => 'full']
         );
 
