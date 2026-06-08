@@ -369,6 +369,19 @@
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/list?lat=45.4642&amp;lng=9.1900</span></h3>
             <p>Restituisce POI reali vicini alle coordinate inviate, ordinati per distanza. Il default e 100 risultati; <code>limit</code> accetta valori da 1 a 500.</p>
+            <table>
+                <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>lat</code></td><td>Si</td><td>Latitudine.</td></tr>
+                    <tr><td><code>lng</code> / <code>lon</code></td><td>Si</td><td>Longitudine.</td></tr>
+                    <tr><td><code>limit</code></td><td>No</td><td>Numero risultati. Default 100, max 500.</td></tr>
+                    <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria (es. <code>Chiesa</code>, <code>Museo</code>). Valori disponibili da <code>/pois/categories</code>.</td></tr>
+                    <tr><td><code>schedaType</code></td><td>No</td><td>Filtra per tipo scheda: <code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>.</td></tr>
+                    <tr><td><code>type</code></td><td>No</td><td>Filtra per tipologia esatta (es. <code>cappella</code>, <code>chiesa</code>).</td></tr>
+                    <tr><td><code>services</code></td><td>No</td><td>Filtra per servizio offerto. Stringa singola o array (es. <code>services[]=Visite+guidate</code>). Valori: <code>Bookshop</code>, <code>Visite guidate</code>, <code>Accesso libero</code>, ecc.</td></tr>
+                    <tr><td><code>location</code></td><td>No</td><td>Filtra per comune, provincia o regione (es. <code>Milano</code>, <code>Lombardia</code>).</td></tr>
+                </tbody>
+            </table>
             <pre><code>{
   "data": [{
     "id": 47954,
@@ -452,13 +465,29 @@ curl "http://localhost:8091/api/v1/pois/all" \
                     <tr><td><code>q</code></td><td>Si</td><td>Testo da cercare.</td></tr>
                     <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
                     <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 500.</td></tr>
+                    <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria (es. <code>Chiesa</code>). Combinabile con <code>q</code>.</td></tr>
+                    <tr><td><code>schedaType</code></td><td>No</td><td><code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>.</td></tr>
+                    <tr><td><code>type</code></td><td>No</td><td>Filtra per tipologia esatta (es. <code>cappella</code>).</td></tr>
+                    <tr><td><code>services</code></td><td>No</td><td>Servizio offerto, stringa o array. Valori: <code>Visite guidate</code>, <code>Bookshop</code>, <code>Accesso libero</code>, ecc.</td></tr>
+                    <tr><td><code>location</code></td><td>No</td><td>Comune, provincia o regione (es. <code>Roma</code>, <code>Sicilia</code>).</td></tr>
                 </tbody>
             </table>
+            <p class="note">Senza parametri (nemmeno <code>q</code>) l'endpoint restituisce tutti i POI paginati. Il campo <code>meta.filters</code> contiene i valori <code>types</code> e <code>services</code> disponibili <em>nei risultati filtrati</em>, utili per popolare i filtri dinamicamente nel frontend.</p>
             <pre><code>curl "http://localhost:8091/api/v1/pois/search?q=Amiternum&page=1&per_page=100" \
   -H "Accept: application/json"</code></pre>
             <pre><code>{
   "data": [{ "id": 12345, "title": "Amiternum", "...": "..." }],
-  "meta": { "total": 3, "page": 1, "per_page": 20, "last_page": 1, "has_more": false }
+  "meta": {
+    "total": 3,
+    "page": 1,
+    "per_page": 100,
+    "last_page": 1,
+    "has_more": false,
+    "filters": {
+      "types": ["cappella", "chiesa", "museo"],
+      "services": ["Accesso libero", "Pannelli informativi", "Visite guidate"]
+    }
+  }
 }</code></pre>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/create</span></h3>

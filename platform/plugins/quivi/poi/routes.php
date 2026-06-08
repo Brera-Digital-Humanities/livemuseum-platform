@@ -1475,21 +1475,126 @@ function lmMockPois()
     );
 }
 
-function lmNearbyPois($lat, $lng, $limit = 100)
+function lmCategoriesForServices(array $services)
+{
+    if (!$services) {
+        return [];
+    }
+
+    $map = [
+        'Museo'             => ['Bookshop', 'Guardaroba', 'Visite guidate'],
+        'Monumento'         => ['Visite guidate', 'Pannelli informativi'],
+        'Sito Archeologico' => ['Percorso visita', 'Pannelli informativi'],
+        'Chiesa'            => ['Accesso libero', 'Visite guidate'],
+        'Biblioteca'        => ['Sala lettura', 'Consultazione cataloghi'],
+        'Archivio'          => ['Consultazione documenti', 'Sala studio'],
+        'Teatro'            => ['Biglietteria', 'Accesso eventi'],
+        'Giardino Storico'  => ['Percorso visita', 'Area verde'],
+    ];
+
+    $matching = [];
+
+    foreach ($map as $category => $catServices) {
+        foreach ($services as $service) {
+            if (in_array($service, $catServices, true)) {
+                $matching[] = $category;
+                break;
+            }
+        }
+    }
+
+    return array_values(array_unique($matching));
+}
+
+function lmPoiQueryMeta($query)
+{
+    $types = (clone $query)
+        ->select('type')
+        ->whereNotNull('type')
+        ->where('type', '<>', '')
+        ->distinct()
+        ->orderBy('type')
+        ->pluck('type')
+        ->toArray();
+
+    $categories = (clone $query)
+        ->select('category_app')
+        ->whereNotNull('category_app')
+        ->where('category_app', '<>', '')
+        ->distinct()
+        ->pluck('category_app')
+        ->toArray();
+
+    $services = [];
+    foreach ($categories as $cat) {
+        foreach (lmPoiServices($cat) as $service) {
+            $services[$service] = true;
+        }
+    }
+    ksort($services);
+
+    return [
+        'types'    => array_values($types),
+        'services' => array_keys($services),
+    ];
+}
+
+function lmApplyPoiFilters($query, Request $request)
+{
+    if ($request->filled('category')) {
+        $query->where('category_app', $request->input('category'));
+    }
+
+    $schedaType = $request->input('schedaType', $request->input('scheda_type'));
+    if ($schedaType) {
+        $query->where('scheda_type', $schedaType);
+    }
+
+    if ($request->filled('type')) {
+        $query->where('type', $request->input('type'));
+    }
+
+    $services = $request->input('services');
+    if ($services) {
+        if (is_string($services)) {
+            $services = array_filter(array_map('trim', explode(',', $services)));
+        }
+        $categories = lmCategoriesForServices(array_values((array) $services));
+        if ($categories) {
+            $query->whereIn('category_app', $categories);
+        }
+    }
+
+    if ($request->filled('location')) {
+        $location = $request->input('location');
+        $query->where(function ($q) use ($location) {
+            $q->where('city', $location)
+              ->orWhere('province', $location)
+              ->orWhere('region', $location);
+        });
+    }
+
+    return $query;
+}
+
+function lmNearbyPois($lat, $lng, $limit = 100, Request $request = null)
 {
     $lat = (float) $lat;
     $lng = (float) $lng;
     $distanceSql = 'ROUND(6371000 * ACOS(LEAST(1, GREATEST(-1, COS(RADIANS(' . $lat . ')) * COS(RADIANS(lat)) * COS(RADIANS(lng) - RADIANS(' . $lng . ')) + SIN(RADIANS(' . $lat . ')) * SIN(RADIANS(lat)))))) AS distance';
 
-    $rows = lmPoiBaseQuery(false)
+    $q = lmPoiBaseQuery(false)
         ->addSelect(Db::raw($distanceSql))
         ->whereNotNull('lat')
         ->whereNotNull('lng')
         ->orderBy('distance')
-        ->limit($limit)
-        ->get();
+        ->limit($limit);
 
-    return lmPoiResponses($rows, ['related' => 'full']);
+    if ($request) {
+        lmApplyPoiFilters($q, $request);
+    }
+
+    return lmPoiResponses($q->get(), ['related' => 'full']);
 }
 
 function lmMockPoi($identifier)
@@ -1513,29 +1618,35 @@ function lmMockPoi($identifier)
     return $row ? lmPoiResponse($row, ['related' => 'full']) : null;
 }
 
-function lmSearchPoisQuery($query)
+function lmSearchPoisQuery($query, Request $request = null)
 {
     $like = '%' . str_replace(['%', '_'], ['\%', '\_'], trim((string) $query)) . '%';
 
-    return lmPoiBaseQuery(false)
-        ->where(function ($q) use ($like) {
-            $q->where('title', 'like', $like)
-              ->orWhere('type', 'like', $like)
-              ->orWhere('category_app', 'like', $like)
-              ->orWhere('city', 'like', $like)
-              ->orWhere('province', 'like', $like)
-              ->orWhere('region', 'like', $like)
-              ->orWhere('fulladdress', 'like', $like);
+    $q = lmPoiBaseQuery(false)
+        ->where(function ($sub) use ($like) {
+            $sub->where('title', 'like', $like)
+                ->orWhere('type', 'like', $like)
+                ->orWhere('category_app', 'like', $like)
+                ->orWhere('city', 'like', $like)
+                ->orWhere('province', 'like', $like)
+                ->orWhere('region', 'like', $like)
+                ->orWhere('fulladdress', 'like', $like);
         });
+
+    if ($request) {
+        lmApplyPoiFilters($q, $request);
+    }
+
+    return $q;
 }
 
-function lmMockSearchPois($query, $limit = 100, $offset = 0)
+function lmMockSearchPois($query, $limit = 100, $offset = 0, Request $request = null)
 {
     if (trim((string) $query) === '') {
         return [];
     }
 
-    $rows = lmSearchPoisQuery($query)
+    $rows = lmSearchPoisQuery($query, $request)
         ->orderBy('title')
         ->limit($limit)
         ->offset($offset)
@@ -1544,13 +1655,13 @@ function lmMockSearchPois($query, $limit = 100, $offset = 0)
     return lmPoiResponses($rows, ['related' => 'full']);
 }
 
-function lmSearchPoisCount($query)
+function lmSearchPoisCount($query, Request $request = null)
 {
     if (trim((string) $query) === '') {
         return 0;
     }
 
-    return (int) lmSearchPoisQuery($query)->count();
+    return (int) lmSearchPoisQuery($query, $request)->count();
 }
 
 function lmPoiCategories()
@@ -1801,14 +1912,15 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             return $error;
         }
 
-        $total = (int) Db::table('quivi_poi_pois')->whereNull('deleted_at')->count();
-
         // Paginated mode: ?page=N[&per_page=N]
         if ($request->filled('page')) {
             $validator = Validator::make($request->all(), [
-                'page'     => 'integer|min:1',
-                'per_page' => 'nullable|integer|min:1|max:500',
-                'limit'    => 'nullable|integer|min:1|max:500',
+                'page'       => 'integer|min:1',
+                'per_page'   => 'nullable|integer|min:1|max:500',
+                'limit'      => 'nullable|integer|min:1|max:500',
+                'category'   => 'nullable|string',
+                'schedaType' => 'nullable|string|in:base,unlockable,livemuseum,community',
+                'scheda_type'=> 'nullable|string|in:base,unlockable,livemuseum,community',
             ]);
 
             if ($validator->fails()) {
@@ -1817,12 +1929,12 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
             ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
 
-            $rows = lmPoiBaseQuery(false)
-                ->orderBy('id')
-                ->limit($perPage)
-                ->offset($offset)
-                ->get();
+            $baseQuery = lmApplyPoiFilters(lmPoiBaseQuery(false), $request);
+            $total     = (int) $baseQuery->count();
 
+            $rows = lmPoiBaseQuery(false);
+            lmApplyPoiFilters($rows, $request);
+            $rows  = $rows->orderBy('id')->limit($perPage)->offset($offset)->get();
             $items = lmPoiResponses($rows, ['related' => 'compact']);
 
             return Response::json([
@@ -1838,7 +1950,9 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             ]);
         }
 
-        // Legacy streaming mode: returns all records
+        // Legacy streaming mode: returns all records (no filters applied)
+        $total = (int) Db::table('quivi_poi_pois')->whereNull('deleted_at')->count();
+
         return Response::stream(function () use ($total) {
             set_time_limit(0);
             $first = true;
@@ -1866,10 +1980,16 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
     Route::get('list', function (Request $request) {
         $validator = Validator::make($request->all(), [
-            'lat' => 'required|numeric',
-            'lng' => 'required_without:lon|numeric',
-            'lon' => 'required_without:lng|numeric',
-            'limit' => 'nullable|integer|min:1|max:500',
+            'lat'        => 'required|numeric',
+            'lng'        => 'required_without:lon|numeric',
+            'lon'        => 'required_without:lng|numeric',
+            'limit'      => 'nullable|integer|min:1|max:500',
+            'category'   => 'nullable|string',
+            'schedaType' => 'nullable|string|in:base,unlockable,livemuseum,community',
+            'scheda_type'=> 'nullable|string|in:base,unlockable,livemuseum,community',
+            'type'       => 'nullable|string',
+            'services'   => 'nullable',
+            'location'   => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -1879,7 +1999,7 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         $lng = $request->input('lng', $request->input('lon'));
 
         return Response::json([
-            'data' => lmNearbyPois($request->input('lat'), $lng, lmPoiLimit($request)),
+            'data' => lmNearbyPois($request->input('lat'), $lng, lmPoiLimit($request), $request),
         ]);
     });
 
@@ -1889,21 +2009,31 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
     Route::get('search', function (Request $request) {
         $validator = Validator::make($request->all(), [
-            'q'        => 'required|string',
-            'page'     => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:1|max:500',
-            'limit'    => 'nullable|integer|min:1|max:500',
+            'q'          => 'nullable|string',
+            'page'       => 'nullable|integer|min:1',
+            'per_page'   => 'nullable|integer|min:1|max:500',
+            'limit'      => 'nullable|integer|min:1|max:500',
+            'category'   => 'nullable|string',
+            'schedaType' => 'nullable|string|in:base,unlockable,livemuseum,community',
+            'scheda_type'=> 'nullable|string|in:base,unlockable,livemuseum,community',
+            'type'       => 'nullable|string',
+            'services'   => 'nullable',
+            'location'   => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return Response::json(['errors' => $validator->errors()], 422);
         }
 
-        $q = $request->input('q');
+        $q = (string) $request->input('q', '');
         ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
 
-        $total = lmSearchPoisCount($q);
-        $items = lmMockSearchPois($q, $perPage, $offset);
+        $total       = (int) lmSearchPoisQuery($q, $request)->count();
+        $filtersMeta = lmPoiQueryMeta(lmSearchPoisQuery($q, $request));
+        $items       = lmPoiResponses(
+            lmSearchPoisQuery($q, $request)->orderBy('title')->limit($perPage)->offset($offset)->get(),
+            ['related' => 'full']
+        );
 
         return Response::json([
             'data' => $items,
@@ -1913,6 +2043,7 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
                 'per_page'  => $perPage,
                 'last_page' => max(1, (int) ceil($total / $perPage)),
                 'has_more'  => ($offset + count($items)) < $total,
+                'filters'   => $filtersMeta,
             ],
         ]);
     });
