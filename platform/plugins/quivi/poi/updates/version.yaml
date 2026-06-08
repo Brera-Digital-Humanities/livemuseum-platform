@@ -21,3 +21,6 @@
 1.0.8:
     - 'Add POI engagement write tables'
     - engagement_schema.php
+1.0.9:
+    - 'Add performance indexes on deleted_at and filter columns'
+    - poi_performance_indexes.php

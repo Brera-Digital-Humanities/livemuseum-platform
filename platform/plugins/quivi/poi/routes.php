@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use System\Models\File as SystemFile;
@@ -1666,23 +1667,25 @@ function lmSearchPoisCount($query, Request $request = null)
 
 function lmPoiCategories()
 {
-    $rows = Db::table('quivi_poi_pois')
-        ->select('category_app', Db::raw('COUNT(*) AS pois_count'))
-        ->whereNull('deleted_at')
-        ->whereNotNull('category_app')
-        ->where('category_app', '<>', '')
-        ->groupBy('category_app')
-        ->orderBy('category_app')
-        ->get();
-    $categories = [];
+    return Cache::remember('lm_poi_categories', 3600, function () {
+        $rows = Db::table('quivi_poi_pois')
+            ->select('category_app', Db::raw('COUNT(*) AS pois_count'))
+            ->whereNull('deleted_at')
+            ->whereNotNull('category_app')
+            ->where('category_app', '<>', '')
+            ->groupBy('category_app')
+            ->orderBy('category_app')
+            ->get();
+        $categories = [];
 
-    foreach ($rows as $row) {
-        $category = lmPoiCategoryForName($row->category_app);
-        $category['count'] = (int) $row->pois_count;
-        $categories[] = $category;
-    }
+        foreach ($rows as $row) {
+            $category = lmPoiCategoryForName($row->category_app);
+            $category['count'] = (int) $row->pois_count;
+            $categories[] = $category;
+        }
 
-    return $categories ?: array_values(lmPoiCategoryDefinitions());
+        return $categories ?: array_values(lmPoiCategoryDefinitions());
+    });
 }
 
 function lmPoiUniqueSlug($title)
@@ -1929,8 +1932,11 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
             ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
 
-            $baseQuery = lmApplyPoiFilters(lmPoiBaseQuery(false), $request);
-            $total     = (int) $baseQuery->count();
+            $filterParams = $request->only(['category', 'schedaType', 'scheda_type', 'type', 'services', 'location']);
+            $countCacheKey = 'lm_poi_all_count_' . md5(serialize($filterParams));
+            $total = (int) Cache::remember($countCacheKey, 120, function () use ($request) {
+                return (int) lmApplyPoiFilters(lmPoiBaseQuery(false), $request)->count();
+            });
 
             $rows = lmPoiBaseQuery(false);
             lmApplyPoiFilters($rows, $request);
@@ -1951,7 +1957,9 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         }
 
         // Legacy streaming mode: returns all records (no filters applied)
-        $total = (int) Db::table('quivi_poi_pois')->whereNull('deleted_at')->count();
+        $total = (int) Cache::remember('lm_poi_total_count', 120, function () {
+            return (int) Db::table('quivi_poi_pois')->whereNull('deleted_at')->count();
+        });
 
         return Response::stream(function () use ($total) {
             set_time_limit(0);
