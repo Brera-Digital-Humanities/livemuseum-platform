@@ -1,0 +1,40 @@
+<?php
+$comments = \Quivi\Poi\Models\Comment::where('user_id', $model->id)
+    ->whereNull('deleted_at')
+    ->orderBy('created_at', 'desc')
+    ->get();
+?>
+
+<?php if ($comments->isEmpty()): ?>
+    <p class="text-muted" style="padding:10px 0">Nessun commento.</p>
+<?php else: ?>
+    <table class="table data" style="margin-top:8px">
+        <thead>
+            <tr>
+                <th style="width:50px">ID</th>
+                <th style="width:80px">Target</th>
+                <th style="width:80px">Target ID</th>
+                <th>Testo</th>
+                <th style="width:140px">Data</th>
+                <th style="width:60px"></th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($comments as $comment): ?>
+                <tr>
+                    <td><?= $comment->id ?></td>
+                    <td><?= e(ucfirst($comment->target_type)) ?></td>
+                    <td><?= $comment->target_id ?></td>
+                    <td><?= e(\Str::limit($comment->comment_text, 80)) ?></td>
+                    <td><?= $comment->created_at ?></td>
+                    <td>
+                        <a href="<?= Backend::url('quivi/poi/comments/update/' . $comment->id) ?>"
+                           class="btn btn-xs btn-default">
+                            Apri
+                        </a>
+                    </td>
+                </tr>
+            <?php endforeach ?>
+        </tbody>
+    </table>
+<?php endif ?>

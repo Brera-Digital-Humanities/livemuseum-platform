@@ -1,0 +1,20 @@
+list: $/quivi/poi/models/comment/columns.yaml
+
+modelClass: Quivi\Poi\Models\Comment
+title: Commenti
+recordUrl: quivi/poi/comments/update/:id
+recordsPerPage: 50
+
+toolbar:
+    search:
+        prompt: Cerca nel testo...
+
+filter:
+    scopes:
+        target_type:
+            label: Tipo target
+            type: group
+            conditions: target_type in (:filtered)
+            options:
+                poi: POI
+                picture: Foto

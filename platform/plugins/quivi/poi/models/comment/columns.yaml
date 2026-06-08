@@ -1,0 +1,25 @@
+columns:
+    id:
+        label: ID
+        sortable: true
+    target_type:
+        label: Target
+    target_id:
+        label: Target
+        type: partial
+        path: $/quivi/poi/partials/_comment_target.htm
+    user_id:
+        label: Utente
+        type: partial
+        path: $/quivi/poi/partials/_comment_user.htm
+    comment_text:
+        label: Testo
+        searchable: true
+    parent_id:
+        label: Risposta a
+        type: partial
+        path: $/quivi/poi/partials/_comment_parent.htm
+    created_at:
+        label: Data
+        type: datetime
+        sortable: true

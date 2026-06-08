@@ -1,0 +1,20 @@
+<?php
+$type  = $record->target_type;
+$id    = $record->target_id;
+
+if ($type === 'poi') {
+    $url   = Backend::url('quivi/poi/pois/update/' . $id);
+    $label = 'POI #' . $id;
+} elseif ($type === 'picture') {
+    $url   = Backend::url('quivi/poi/pictures/update/' . $id);
+    $label = 'Foto #' . $id;
+} else {
+    $url   = null;
+    $label = ucfirst($type) . ' #' . $id;
+}
+?>
+<?php if ($url): ?>
+    <a href="<?= $url ?>" class="btn btn-xs btn-default"><?= e($label) ?></a>
+<?php else: ?>
+    <span class="text-muted"><?= e($label) ?></span>
+<?php endif ?>

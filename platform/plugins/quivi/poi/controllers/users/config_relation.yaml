@@ -1,0 +1,8 @@
+comments:
+    label: Commenti
+    modelClass: Quivi\Poi\Models\Comment
+    type: hasMany
+    conditions: user_id = :id
+    view:
+        list: $/quivi/poi/models/comment/columns.yaml
+        toolbarButtons: false

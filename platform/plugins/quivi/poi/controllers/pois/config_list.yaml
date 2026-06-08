@@ -1,0 +1,29 @@
+list: $/quivi/poi/models/poi/columns.yaml
+
+modelClass: Quivi\Poi\Models\Poi
+title: POI
+recordUrl: quivi/poi/pois/update/:id
+recordsPerPage: 50
+
+toolbar:
+    buttons: list_toolbar
+    search:
+        prompt: Cerca per titolo, tipo, categoria, città...
+
+filter:
+    scopes:
+        scheda_type:
+            label: Tipo scheda
+            type: group
+            conditions: scheda_type in (:filtered)
+            options:
+                base: Base
+                unlockable: Unlockable
+                livemuseum: LiveMuseum
+                community: Community
+        category_app:
+            label: Categoria
+            type: group
+            modelClass: Quivi\Poi\Models\Poi
+            conditions: category_app in (:filtered)
+            nameFrom: category_app

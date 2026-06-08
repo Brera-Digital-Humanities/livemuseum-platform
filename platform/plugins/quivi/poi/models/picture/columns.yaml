@@ -1,0 +1,16 @@
+columns:
+    id:
+        label: ID
+        sortable: true
+    poi_id:
+        label: POI ID
+        sortable: true
+    user_id:
+        label: Utente ID
+    caption:
+        label: Didascalia
+        searchable: true
+    created_at:
+        label: Caricata
+        type: datetime
+        sortable: true

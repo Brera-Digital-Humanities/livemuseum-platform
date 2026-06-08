@@ -1,0 +1,19 @@
+list: $/quivi/poi/models/bookmark/columns.yaml
+
+modelClass: Quivi\Poi\Models\Bookmark
+title: Bookmark
+recordsPerPage: 50
+
+toolbar:
+    search:
+        prompt: Cerca...
+
+filter:
+    scopes:
+        target_type:
+            label: Tipo target
+            type: group
+            conditions: target_type in (:filtered)
+            options:
+                poi: POI
+                picture: Foto

@@ -1,0 +1,16 @@
+columns:
+    id:
+        label: ID
+        sortable: true
+    user_id:
+        label: Utente ID
+    target_type:
+        label: Tipo
+    target_id:
+        label: Target ID
+    folder_id:
+        label: Cartella ID
+    created_at:
+        label: Data
+        type: datetime
+        sortable: true

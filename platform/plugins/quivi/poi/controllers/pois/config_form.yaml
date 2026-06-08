@@ -1,0 +1,11 @@
+name: POI
+form: $/quivi/poi/models/poi/fields.yaml
+modelClass: Quivi\Poi\Models\Poi
+
+create:
+    title: Nuovo POI
+update:
+    title: Modifica POI
+
+flashSave: POI salvato.
+flashDelete: POI eliminato.

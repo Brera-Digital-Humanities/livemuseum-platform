@@ -1,0 +1,65 @@
+<?php
+$allComments = \Quivi\Poi\Models\Comment::with('user')
+    ->where('target_type', 'poi')
+    ->where('target_id', $model->id)
+    ->whereNull('deleted_at')
+    ->orderBy('created_at')
+    ->get()
+    ->keyBy('id');
+
+$roots = $allComments->whereNull('parent_id')->values();
+
+function renderPoiComment($comment, $allComments, $depth = 0) {
+    $user     = $comment->user;
+    $userName = $user ? trim($user->name . ' ' . $user->surname) : 'Utente #' . $comment->user_id;
+    $userUrl  = $user ? Backend::url('winter/user/users/update/' . $user->id) : null;
+    $editUrl  = Backend::url('quivi/poi/comments/update/' . $comment->id);
+    $replies  = $allComments->where('parent_id', $comment->id)->values();
+    $bg       = $depth % 2 === 0 ? '#ffffff' : '#f7f8fa';
+    $pl       = 12 + ($depth * 24);
+    ?>
+    <tr style="background:<?= $bg ?>">
+        <td style="padding-left:<?= $pl ?>px; white-space:nowrap">
+            <?php if ($depth > 0): ?>
+                <span style="color:#aaa; margin-right:4px">↳</span>
+            <?php endif ?>
+            #<?= $comment->id ?>
+        </td>
+        <td>
+            <?php if ($userUrl): ?>
+                <a href="<?= $userUrl ?>" class="btn btn-xs btn-default"><?= e($userName) ?></a>
+            <?php else: ?>
+                <span class="text-muted"><?= e($userName) ?></span>
+            <?php endif ?>
+        </td>
+        <td><?= e(\Str::limit($comment->comment_text, 100)) ?></td>
+        <td style="white-space:nowrap"><?= $comment->created_at ?></td>
+        <td><a href="<?= $editUrl ?>" class="btn btn-xs btn-default">Apri</a></td>
+    </tr>
+    <?php
+    foreach ($replies as $reply) {
+        renderPoiComment($reply, $allComments, $depth + 1);
+    }
+}
+?>
+
+<?php if ($roots->isEmpty()): ?>
+    <p class="text-muted" style="padding:10px 0">Nessun commento.</p>
+<?php else: ?>
+    <table class="table data" style="margin-top:8px">
+        <thead>
+            <tr>
+                <th style="width:70px">ID</th>
+                <th style="width:160px">Utente</th>
+                <th>Testo</th>
+                <th style="width:140px">Data</th>
+                <th style="width:60px"></th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($roots as $comment): ?>
+                <?php renderPoiComment($comment, $allComments) ?>
+            <?php endforeach ?>
+        </tbody>
+    </table>
+<?php endif ?>

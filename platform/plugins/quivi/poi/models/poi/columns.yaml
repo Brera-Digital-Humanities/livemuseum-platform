@@ -1,0 +1,25 @@
+columns:
+    id:
+        label: ID
+        sortable: true
+    title:
+        label: Titolo
+        searchable: true
+        sortable: true
+    type:
+        label: Tipo
+        searchable: true
+    category_app:
+        label: Categoria
+        searchable: true
+    city:
+        label: Città
+        searchable: true
+    province:
+        label: Provincia
+    scheda_type:
+        label: Scheda
+    created_at:
+        label: Creato
+        type: datetime
+        sortable: true

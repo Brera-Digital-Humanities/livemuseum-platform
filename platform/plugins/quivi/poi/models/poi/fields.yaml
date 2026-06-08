@@ -1,0 +1,93 @@
+fields:
+    title:
+        label: Titolo
+        required: true
+        span: left
+    slug:
+        label: Slug
+        span: right
+    scheda_type:
+        label: Tipo scheda
+        type: dropdown
+        span: left
+    category_app:
+        label: Categoria
+        span: right
+    type:
+        label: Tipo
+        span: left
+    source_url:
+        label: URL sorgente
+        span: right
+    license:
+        label: Licenza
+        span: left
+
+tabs:
+    fields:
+        fulladdress:
+            label: Indirizzo completo
+            tab: Localizzazione
+        address:
+            label: Via
+            tab: Localizzazione
+            span: left
+        city:
+            label: Città
+            tab: Localizzazione
+            span: right
+        province:
+            label: Provincia
+            tab: Localizzazione
+            span: left
+        region:
+            label: Regione
+            tab: Localizzazione
+            span: right
+        zipcode:
+            label: CAP
+            tab: Localizzazione
+            span: left
+        lat:
+            label: Latitudine
+            tab: Localizzazione
+            span: left
+        lng:
+            label: Longitudine
+            tab: Localizzazione
+            span: right
+        descr:
+            label: Descrizione
+            tab: Dettagli
+            type: textarea
+            size: large
+        image_url:
+            label: Immagine URL
+            tab: Dettagli
+        phone:
+            label: Telefono
+            tab: Dettagli
+            span: left
+        email:
+            label: Email
+            tab: Dettagli
+            span: right
+        website:
+            label: Sito web
+            tab: Dettagli
+            span: left
+        tickets_info:
+            label: Info biglietti
+            tab: Dettagli
+            type: textarea
+            size: small
+        booking_info:
+            label: Info prenotazione
+            tab: Dettagli
+            type: textarea
+            size: small
+        poi_comments:
+            label: Commenti
+            tab: Commenti
+            type: partial
+            path: $/quivi/poi/partials/_poi_comments.htm

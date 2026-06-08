@@ -1,0 +1,18 @@
+fields:
+    target_type:
+        label: Tipo target
+        type: dropdown
+        span: left
+    target_id:
+        label: Target ID
+        span: right
+    user_id:
+        label: Utente ID
+        span: left
+    parent_id:
+        label: Risposta a (ID commento)
+        span: right
+    comment_text:
+        label: Testo commento
+        type: textarea
+        required: true

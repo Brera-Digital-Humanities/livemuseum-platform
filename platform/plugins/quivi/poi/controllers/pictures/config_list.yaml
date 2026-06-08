@@ -1,0 +1,10 @@
+list: $/quivi/poi/models/picture/columns.yaml
+
+modelClass: Quivi\Poi\Models\Picture
+title: Foto
+recordUrl: quivi/poi/pictures/update/:id
+recordsPerPage: 50
+
+toolbar:
+    search:
+        prompt: Cerca per didascalia...

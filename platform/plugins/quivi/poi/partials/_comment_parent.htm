@@ -1,0 +1,7 @@
+<?php if ($record->parent_id): ?>
+    <a href="<?= Backend::url('quivi/poi/comments/update/' . $record->parent_id) ?>" class="btn btn-xs btn-default">
+        Commento #<?= $record->parent_id ?>
+    </a>
+<?php else: ?>
+    <span class="text-muted">—</span>
+<?php endif ?>

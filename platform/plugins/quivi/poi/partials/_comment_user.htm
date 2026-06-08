@@ -1,0 +1,10 @@
+<?php
+$user = $record->user;
+$name = $user ? trim($user->name . ' ' . $user->surname) : 'Utente #' . $record->user_id;
+$url  = $user ? Backend::url('winter/user/users/update/' . $user->id) : null;
+?>
+<?php if ($url): ?>
+    <a href="<?= $url ?>" class="btn btn-xs btn-default"><?= e($name) ?></a>
+<?php else: ?>
+    <span class="text-muted"><?= e($name) ?></span>
+<?php endif ?>

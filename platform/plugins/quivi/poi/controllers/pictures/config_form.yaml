@@ -1,0 +1,9 @@
+name: Foto
+form: $/quivi/poi/models/picture/fields.yaml
+modelClass: Quivi\Poi\Models\Picture
+
+update:
+    title: Modifica foto
+
+flashSave: Foto salvata.
+flashDelete: Foto eliminata.

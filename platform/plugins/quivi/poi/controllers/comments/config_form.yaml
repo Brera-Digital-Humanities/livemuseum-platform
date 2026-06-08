@@ -1,0 +1,9 @@
+name: Commento
+form: $/quivi/poi/models/comment/fields.yaml
+modelClass: Quivi\Poi\Models\Comment
+
+update:
+    title: Modifica commento
+
+flashSave: Commento salvato.
+flashDelete: Commento eliminato.

@@ -1,0 +1,21 @@
+fields:
+    poi_id:
+        label: POI ID
+        required: true
+        span: left
+    user_id:
+        label: Utente ID
+        span: right
+    picture:
+        label: URL immagine
+        required: true
+    caption:
+        label: Didascalia
+        type: textarea
+        size: small
+    exif_lat:
+        label: EXIF Latitudine
+        span: left
+    exif_lng:
+        label: EXIF Longitudine
+        span: right

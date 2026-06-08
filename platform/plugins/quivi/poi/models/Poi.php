@@ -25,6 +25,10 @@ class Poi extends Model
     public $rules = [
     ];
 
+    public $hasMany = [
+        'comments' => [\Quivi\Poi\Models\Comment::class, 'key' => 'target_id', 'conditions' => "target_type = 'poi'"],
+    ];
+
     public function getSchedaTypeOptions()
     {
         return [
