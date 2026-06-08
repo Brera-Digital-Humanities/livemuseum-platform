@@ -1,7 +1,6 @@
 <?php namespace Quivi\Poi\Updates;
 
 use Db;
-use Schema;
 use Winter\Storm\Database\Updates\Migration;
 
 class PoiPerformanceIndexes extends Migration
@@ -23,8 +22,8 @@ class PoiPerformanceIndexes extends Migration
 
     public function up()
     {
-        foreach ($this->indexes as $name => $sql) {
-            $this->addIndexIfMissing('quivi_poi_pois', $name, $sql);
+        foreach ($this->indexes as $sql) {
+            $this->addIndexIfMissing($sql);
         }
     }
 
@@ -35,26 +34,21 @@ class PoiPerformanceIndexes extends Migration
         }
     }
 
-    private function addIndexIfMissing($table, $index, $sql)
+    private function addIndexIfMissing($sql)
     {
-        if (!$this->indexExists($table, $index)) {
+        try {
             Db::statement($sql);
+        } catch (\Exception $e) {
+            // Index already exists — safe to skip
         }
     }
 
     private function dropIndexIfExists($table, $index)
     {
-        if ($this->indexExists($table, $index)) {
+        try {
             Db::statement('DROP INDEX ' . $index . ' ON ' . $table);
+        } catch (\Exception $e) {
+            // Index does not exist — safe to skip
         }
-    }
-
-    private function indexExists($table, $index)
-    {
-        return Db::table('information_schema.statistics')
-            ->where('table_schema', Db::getDatabaseName())
-            ->where('table_name', $table)
-            ->where('index_name', $index)
-            ->exists();
     }
 }
