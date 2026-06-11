@@ -1,0 +1,23 @@
+columns:
+    id:
+        label: ID
+        sortable: true
+    itinerary_id:
+        label: Itinerario
+        relation: itinerary
+        select: title
+        sortable: true
+    poi_id:
+        label: POI
+        relation: poi
+        select: name
+        sortable: true
+    sort_order:
+        label: Ordine
+        sortable: true
+    note:
+        label: Nota
+    created_at:
+        label: Creato il
+        type: datetime
+        sortable: true

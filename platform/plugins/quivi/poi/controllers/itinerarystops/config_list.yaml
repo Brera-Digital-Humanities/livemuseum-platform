@@ -1,0 +1,10 @@
+list: $/quivi/poi/models/itinerarystop/columns.yaml
+
+modelClass: Quivi\Poi\Models\ItineraryStop
+title: Tappe itinerario
+recordUrl: quivi/poi/itinerarystops/update/:id
+recordsPerPage: 50
+
+toolbar:
+    search:
+        prompt: Cerca tappa...

@@ -1,0 +1,55 @@
+<?php
+/** @var \Quivi\Poi\Models\Itinerary $model */
+if (!$model->exists): ?>
+    <p class="help-block" style="padding:12px 0">
+        Salva prima l'itinerario per poter aggiungere tappe.
+    </p>
+<?php else:
+    $stops = $model->stops()->with('poi')->orderBy('sort_order')->get();
+?>
+    <div style="margin-bottom:12px">
+        <a href="<?= Backend::url('quivi/poi/itinerarystops/create?itinerary_id=' . $model->id) ?>"
+           class="btn btn-primary btn-sm">
+            <i class="icon-plus"></i> Aggiungi tappa
+        </a>
+    </div>
+
+    <?php if ($stops->isEmpty()): ?>
+        <p class="help-block">Nessuna tappa ancora.</p>
+    <?php else: ?>
+        <table class="table data">
+            <thead>
+                <tr>
+                    <th style="width:50px">Ordine</th>
+                    <th>POI</th>
+                    <th>Nota</th>
+                    <th style="width:80px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($stops as $stop): ?>
+                <tr>
+                    <td><?= (int) $stop->sort_order ?></td>
+                    <td>
+                        <?php if ($stop->poi): ?>
+                            <a href="<?= Backend::url('quivi/poi/pois/update/' . $stop->poi_id) ?>"
+                               target="_blank">
+                                <?= e($stop->poi->name ?? 'POI #' . $stop->poi_id) ?>
+                            </a>
+                        <?php else: ?>
+                            POI #<?= (int) $stop->poi_id ?>
+                        <?php endif ?>
+                    </td>
+                    <td><?= e($stop->note ?? '—') ?></td>
+                    <td>
+                        <a href="<?= Backend::url('quivi/poi/itinerarystops/update/' . $stop->id) ?>"
+                           class="btn btn-xs btn-default">
+                            Modifica
+                        </a>
+                    </td>
+                </tr>
+                <?php endforeach ?>
+            </tbody>
+        </table>
+    <?php endif ?>
+<?php endif ?>

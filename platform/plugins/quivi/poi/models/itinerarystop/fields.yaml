@@ -1,0 +1,36 @@
+fields:
+    itinerary_id:
+        label: Itinerary ID
+        type: number
+        hidden: true
+
+    itinerary_button:
+        type: partial
+        path: $/quivi/poi/partials/_form_itinerarystop_itinerary.htm
+        span: left
+
+    poi:
+        label: POI
+        type: recordfinder
+        span: right
+        required: true
+        list: $/quivi/poi/models/poi/columns.yaml
+        recordsPerPage: 15
+        title: Seleziona POI
+        prompt: Cerca un POI...
+        nameFrom: name
+        descriptionFrom: type
+        keyFrom: id
+        conditions: deleted_at IS NULL
+
+    sort_order:
+        label: Ordine
+        type: number
+        span: left
+        default: 1
+
+    note:
+        label: Nota
+        type: textarea
+        span: full
+        size: tiny

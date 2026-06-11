@@ -1,0 +1,18 @@
+<?php /** @var \Quivi\Poi\Models\ItineraryStop $model */ ?>
+<div class="form-group">
+    <label class="control-label">POI</label>
+    <div>
+        <?php if ($model->poi_id): ?>
+            <a href="<?= Backend::url('quivi/poi/pois/update/' . $model->poi_id) ?>"
+               class="btn btn-default btn-sm" target="_blank">
+                <i class="icon-map-marker"></i>
+                Apri POI #<?= $model->poi_id ?>
+                <?php if ($model->poi): ?>
+                    — <?= e($model->poi->name) ?>
+                <?php endif ?>
+            </a>
+        <?php else: ?>
+            <span class="help-inline">—</span>
+        <?php endif ?>
+    </div>
+</div>

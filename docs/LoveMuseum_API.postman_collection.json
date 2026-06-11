@@ -1007,7 +1007,7 @@
           "response": []
         },
         {
-          "name": "Search POIs \u2014 filters only (no q)",
+          "name": "Search POIs — filters only (no q)",
           "event": [
             {
               "listen": "test",
@@ -2638,6 +2638,303 @@
       ]
     },
     {
+      "name": "Itineraries",
+      "item": [
+        {
+          "name": "List itineraries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create itinerary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Giro del centro storico\",\n  \"description\": \"Un percorso tra chiese e piazze.\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get itinerary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/{{itineraryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "{{itineraryId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update itinerary",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/{{itineraryId}}/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "{{itineraryId}}",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Titolo aggiornato\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete itinerary",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/{{itineraryId}}/delete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "{{itineraryId}}",
+                "delete"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add stop",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/{{itineraryId}}/stops/add",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "{{itineraryId}}",
+                "stops",
+                "add"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"poi_id\": \"{{poiId}}\",\n  \"note\": \"Prima tappa\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update stop",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/{{itineraryId}}/stops/{{stopId}}/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "{{itineraryId}}",
+                "stops",
+                "{{stopId}}",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sort_order\": 2,\n  \"note\": \"Tappa aggiornata\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove stop",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/{{itineraryId}}/stops/{{stopId}}/remove",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "{{itineraryId}}",
+                "stops",
+                "{{stopId}}",
+                "remove"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reorder stops",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/itineraries/{{itineraryId}}/stops/reorder",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "itineraries",
+                "{{itineraryId}}",
+                "stops",
+                "reorder"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stops\": [\n    {\n      \"id\": \"{{stopId}}\",\n      \"sort_order\": 1\n    }\n  ]\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Badges",
       "item": [
         {
@@ -2857,6 +3154,16 @@
     {
       "key": "badgeId",
       "value": "801",
+      "type": "string"
+    },
+    {
+      "key": "itineraryId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "stopId",
+      "value": "1",
       "type": "string"
     }
   ]

@@ -783,6 +783,75 @@ const { logged } = await fetch('/api/v1/users/check', {
         </section>
 
         <section>
+            <h2>Itinerari</h2>
+            <p>Itinerari client-side: raccolte ordinate di tappe (POI). Nessuna autenticazione richiesta — il client gestisce l'ownership tramite gli ID salvati localmente.</p>
+
+            <h4>Struttura risposta itinerario</h4>
+            <pre><code>{
+  "id": 1,
+  "title": "Giro del centro storico",
+  "description": "Un percorso tra chiese e piazze.",
+  "stops_count": 3,
+  "created_at": "2026-06-11 10:00:00",
+  "updated_at": "2026-06-11 10:00:00",
+  "stops": [
+    {
+      "id": 1,
+      "sort_order": 1,
+      "note": "Partenza da qui",
+      "poi": { "id": 42, "name": "Duomo", "type": "chiesa", ... }
+    }
+  ]
+}</code></pre>
+
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/itineraries</span></h3>
+            <p>Lista di tutti gli itinerari.</p>
+            <pre><code>curl {{baseUrl}}/api/v1/itineraries</code></pre>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/itineraries/create</span></h3>
+            <p>Crea un nuovo itinerario. Campi: <code>title</code> (obbligatorio), <code>description</code> (opzionale).</p>
+            <pre><code>curl -X POST {{baseUrl}}/api/v1/itineraries/create \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Giro del centro","description":"Un percorso tra chiese e piazze."}'</code></pre>
+
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/itineraries/{id}</span></h3>
+            <p>Dettaglio itinerario con tappe ordinate e sommario POI.</p>
+            <pre><code>curl {{baseUrl}}/api/v1/itineraries/1</code></pre>
+
+            <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/itineraries/{id}/update</span></h3>
+            <p>Modifica titolo o descrizione. Accetta anche <code>PUT</code>.</p>
+            <pre><code>curl -X PATCH {{baseUrl}}/api/v1/itineraries/1/update \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Nuovo titolo"}'</code></pre>
+
+            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/itineraries/{id}/delete</span></h3>
+            <p>Soft-delete dell'itinerario.</p>
+            <pre><code>curl -X DELETE {{baseUrl}}/api/v1/itineraries/1/delete</code></pre>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/itineraries/{id}/stops/add</span></h3>
+            <p>Aggiunge una tappa. Campi: <code>poi_id</code> (obbligatorio), <code>sort_order</code> (default: auto-append), <code>note</code> (opzionale).</p>
+            <pre><code>curl -X POST {{baseUrl}}/api/v1/itineraries/1/stops/add \
+  -H "Content-Type: application/json" \
+  -d '{"poi_id":42,"note":"Partenza da qui"}'</code></pre>
+
+            <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/itineraries/{id}/stops/{stopId}/update</span></h3>
+            <p>Modifica <code>sort_order</code> e/o <code>note</code> di una tappa.</p>
+            <pre><code>curl -X PATCH {{baseUrl}}/api/v1/itineraries/1/stops/1/update \
+  -H "Content-Type: application/json" \
+  -d '{"sort_order":2,"note":"Tappa aggiornata"}'</code></pre>
+
+            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/itineraries/{id}/stops/{stopId}/remove</span></h3>
+            <p>Rimuove una tappa dall'itinerario.</p>
+            <pre><code>curl -X DELETE {{baseUrl}}/api/v1/itineraries/1/stops/1/remove</code></pre>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/itineraries/{id}/stops/reorder</span></h3>
+            <p>Riordina le tappe. Body: array di oggetti con <code>id</code> e <code>sort_order</code>.</p>
+            <pre><code>curl -X POST {{baseUrl}}/api/v1/itineraries/1/stops/reorder \
+  -H "Content-Type: application/json" \
+  -d '{"stops":[{"id":1,"sort_order":2},{"id":2,"sort_order":1}]}'</code></pre>
+        </section>
+
+        <section>
             <h2>Badges</h2>
             <p>I badge sono raggruppabili lato app tramite <code>category</code>, come nella schermata "I miei badge".</p>
             <pre><code>{

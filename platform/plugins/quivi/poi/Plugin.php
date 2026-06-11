@@ -89,6 +89,12 @@ class Plugin extends PluginBase
                         'icon'        => 'icon-flag',
                         'permissions' => ['quivi.poi.reports'],
                     ],
+                    'itineraries' => [
+                        'label'       => 'Itinerari',
+                        'url'         => Backend::url('quivi/poi/itineraries'),
+                        'icon'        => 'icon-road',
+                        'permissions' => ['quivi.poi.itineraries'],
+                    ],
                 ],
             ],
         ];
@@ -120,6 +126,10 @@ class Plugin extends PluginBase
             'quivi.poi.reports' => [
                 'tab'   => 'LiveMuseum',
                 'label' => 'Gestione segnalazioni',
+            ],
+            'quivi.poi.itineraries' => [
+                'tab'   => 'LiveMuseum',
+                'label' => 'Gestione itinerari',
             ],
         ];
     }

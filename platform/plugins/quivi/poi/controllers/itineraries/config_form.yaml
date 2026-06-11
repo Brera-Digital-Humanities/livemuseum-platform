@@ -1,0 +1,11 @@
+name: Itinerario
+form: $/quivi/poi/models/itinerary/fields.yaml
+modelClass: Quivi\Poi\Models\Itinerary
+
+create:
+    title: Nuovo itinerario
+update:
+    title: Modifica itinerario
+
+flashSave: Itinerario salvato.
+flashDelete: Itinerario eliminato.

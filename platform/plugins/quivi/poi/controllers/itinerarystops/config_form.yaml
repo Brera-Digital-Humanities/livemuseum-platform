@@ -1,0 +1,13 @@
+name: Tappa
+form: $/quivi/poi/models/itinerarystop/fields.yaml
+modelClass: Quivi\Poi\Models\ItineraryStop
+
+create:
+    title: Nuova tappa
+update:
+    title: Modifica tappa
+
+defaultRedirect: quivi/poi/itineraries
+
+flashSave: Tappa salvata.
+flashDelete: Tappa eliminata.

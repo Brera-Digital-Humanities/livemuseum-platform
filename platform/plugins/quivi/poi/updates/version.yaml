@@ -36,3 +36,6 @@
 1.0.13:
     - 'Add comment reports table and reports_count/is_hidden on comments'
     - comments_reports_schema.php
+1.0.14:
+    - 'Add itineraries and itinerary stops tables'
+    - itineraries_schema.php

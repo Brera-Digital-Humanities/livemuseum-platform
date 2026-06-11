@@ -1,0 +1,18 @@
+list: $/quivi/poi/models/itinerary/columns.yaml
+
+modelClass: Quivi\Poi\Models\Itinerary
+title: Itinerari
+recordUrl: quivi/poi/itineraries/update/:id
+recordsPerPage: 50
+
+toolbar:
+    buttons: list_toolbar
+    search:
+        prompt: Cerca itinerario...
+
+filter:
+    scopes:
+        deleted_at:
+            label: Eliminati
+            type: checkbox
+            conditions: deleted_at IS NOT NULL

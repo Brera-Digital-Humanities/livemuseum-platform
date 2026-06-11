@@ -3125,3 +3125,283 @@ Route::group(['prefix' => 'api/v1/users'], function () {
         ]);
     });
 });
+
+// ---------------------------------------------------------------------------
+// Itineraries
+// ---------------------------------------------------------------------------
+
+function lmItineraryTableExists()
+{
+    static $exists = null;
+    if ($exists === null) {
+        $exists = Schema::hasTable('quivi_poi_itineraries');
+    }
+    return $exists;
+}
+
+function lmItineraryStopResponse($stop, $poiRow = null)
+{
+    return [
+        'id'         => (int) $stop->id,
+        'sort_order' => (int) $stop->sort_order,
+        'note'       => $stop->note,
+        'poi'        => $poiRow ? lmPoiSummary($poiRow) : ['id' => (int) $stop->poi_id],
+    ];
+}
+
+function lmItineraryResponse($row, bool $withStops = false)
+{
+    $data = [
+        'id'          => (int) $row->id,
+        'title'       => $row->title,
+        'description' => $row->description,
+        'stops_count' => (int) Db::table('quivi_poi_itinerary_stops')->where('itinerary_id', $row->id)->count(),
+        'created_at'  => $row->created_at,
+        'updated_at'  => $row->updated_at,
+    ];
+
+    if ($withStops) {
+        $stops  = Db::table('quivi_poi_itinerary_stops')
+            ->where('itinerary_id', $row->id)
+            ->orderBy('sort_order')
+            ->get();
+        $poiIds = $stops->pluck('poi_id')->unique()->values()->toArray();
+        $poiRows = Db::table('quivi_poi_pois')
+            ->select(lmPoiSelectedColumns())
+            ->whereIn('id', $poiIds)
+            ->whereNull('deleted_at')
+            ->get()
+            ->keyBy('id');
+
+        $data['stops'] = $stops->map(function ($stop) use ($poiRows) {
+            return lmItineraryStopResponse($stop, $poiRows->get($stop->poi_id));
+        })->values()->toArray();
+    }
+
+    return $data;
+}
+
+Route::group(['prefix' => 'api/v1/itineraries'], function () {
+
+    // GET /itineraries
+    Route::get('', function (Request $request) {
+        if (!lmItineraryTableExists()) {
+            return Response::json(['data' => []]);
+        }
+        $rows = Db::table('quivi_poi_itineraries')
+            ->whereNull('deleted_at')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return Response::json(['data' => $rows->map(fn($r) => lmItineraryResponse($r))->values()]);
+    });
+
+    // POST /itineraries/create
+    Route::post('create', function (Request $request) {
+        $validator = Validator::make($request->all(), [
+            'title'       => 'required|string|between:1,255',
+            'description' => 'nullable|string|max:2000',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Itinerary storage is not available.'], 500);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $id  = Db::table('quivi_poi_itineraries')->insertGetId([
+            'title'       => $request->input('title'),
+            'description' => $request->input('description'),
+            'created_at'  => $now,
+            'updated_at'  => $now,
+        ]);
+
+        $row = Db::table('quivi_poi_itineraries')->where('id', $id)->first();
+        return Response::json(lmItineraryResponse($row, true), 201);
+    });
+
+    // GET /itineraries/{id}
+    Route::get('{id}', function (Request $request, $id) {
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+        $row = Db::table('quivi_poi_itineraries')->where('id', (int) $id)->whereNull('deleted_at')->first();
+
+        if (!$row) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        return Response::json(lmItineraryResponse($row, true));
+    });
+
+    // PATCH /itineraries/{id}/update
+    Route::match(['put', 'patch'], '{id}/update', function (Request $request, $id) {
+        $validator = Validator::make($request->all(), [
+            'title'       => 'sometimes|required|string|between:1,255',
+            'description' => 'nullable|string|max:2000',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        $row = Db::table('quivi_poi_itineraries')->where('id', (int) $id)->whereNull('deleted_at')->first();
+        if (!$row) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        $fields = ['updated_at' => date('Y-m-d H:i:s')];
+        if ($request->has('title'))       $fields['title']       = $request->input('title');
+        if ($request->has('description')) $fields['description'] = $request->input('description');
+
+        Db::table('quivi_poi_itineraries')->where('id', (int) $id)->update($fields);
+        $row = Db::table('quivi_poi_itineraries')->where('id', (int) $id)->first();
+        return Response::json(lmItineraryResponse($row, true));
+    });
+
+    // DELETE /itineraries/{id}/delete
+    Route::delete('{id}/delete', function (Request $request, $id) {
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        $row = Db::table('quivi_poi_itineraries')->where('id', (int) $id)->whereNull('deleted_at')->first();
+        if (!$row) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        Db::table('quivi_poi_itineraries')->where('id', (int) $id)->update(['deleted_at' => date('Y-m-d H:i:s')]);
+        return Response::json(['success' => true, 'id' => (int) $id]);
+    });
+
+    // POST /itineraries/{id}/stops/add
+    Route::post('{id}/stops/add', function (Request $request, $id) {
+        $validator = Validator::make($request->all(), [
+            'poi_id'     => 'required|integer|min:1',
+            'sort_order' => 'nullable|integer|min:1',
+            'note'       => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        $row = Db::table('quivi_poi_itineraries')->where('id', (int) $id)->whereNull('deleted_at')->first();
+        if (!$row) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        $sortOrder = $request->has('sort_order')
+            ? (int) $request->input('sort_order')
+            : (int) Db::table('quivi_poi_itinerary_stops')->where('itinerary_id', (int) $id)->max('sort_order') + 1;
+
+        $now    = date('Y-m-d H:i:s');
+        $stopId = Db::table('quivi_poi_itinerary_stops')->insertGetId([
+            'itinerary_id' => (int) $id,
+            'poi_id'       => (int) $request->input('poi_id'),
+            'sort_order'   => max(1, $sortOrder),
+            'note'         => $request->input('note'),
+            'created_at'   => $now,
+            'updated_at'   => $now,
+        ]);
+
+        $stop   = Db::table('quivi_poi_itinerary_stops')->where('id', $stopId)->first();
+        $poiRow = Db::table('quivi_poi_pois')->select(lmPoiSelectedColumns())->where('id', $stop->poi_id)->first();
+        return Response::json(lmItineraryStopResponse($stop, $poiRow), 201);
+    });
+
+    // PATCH /itineraries/{id}/stops/{stopId}/update
+    Route::match(['put', 'patch'], '{id}/stops/{stopId}/update', function (Request $request, $id, $stopId) {
+        $validator = Validator::make($request->all(), [
+            'sort_order' => 'nullable|integer|min:1',
+            'note'       => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Stop not found.'], 404);
+        }
+
+        $stop = Db::table('quivi_poi_itinerary_stops')
+            ->where('id', (int) $stopId)
+            ->where('itinerary_id', (int) $id)
+            ->first();
+
+        if (!$stop) {
+            return Response::json(['error' => 'Stop not found.'], 404);
+        }
+
+        $fields = ['updated_at' => date('Y-m-d H:i:s')];
+        if ($request->has('sort_order')) $fields['sort_order'] = max(1, (int) $request->input('sort_order'));
+        if ($request->has('note'))       $fields['note']       = $request->input('note');
+
+        Db::table('quivi_poi_itinerary_stops')->where('id', (int) $stopId)->update($fields);
+        $stop   = Db::table('quivi_poi_itinerary_stops')->where('id', (int) $stopId)->first();
+        $poiRow = Db::table('quivi_poi_pois')->select(lmPoiSelectedColumns())->where('id', $stop->poi_id)->first();
+        return Response::json(lmItineraryStopResponse($stop, $poiRow));
+    });
+
+    // DELETE /itineraries/{id}/stops/{stopId}/remove
+    Route::delete('{id}/stops/{stopId}/remove', function (Request $request, $id, $stopId) {
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Stop not found.'], 404);
+        }
+
+        $deleted = Db::table('quivi_poi_itinerary_stops')
+            ->where('id', (int) $stopId)
+            ->where('itinerary_id', (int) $id)
+            ->delete();
+
+        if (!$deleted) {
+            return Response::json(['error' => 'Stop not found.'], 404);
+        }
+
+        return Response::json(['success' => true, 'id' => (int) $stopId]);
+    });
+
+    // POST /itineraries/{id}/stops/reorder — body: { "stops": [{"id":1,"sort_order":1},{"id":2,"sort_order":2}] }
+    Route::post('{id}/stops/reorder', function (Request $request, $id) {
+        $validator = Validator::make($request->all(), [
+            'stops'                => 'required|array|min:1',
+            'stops.*.id'           => 'required|integer',
+            'stops.*.sort_order'   => 'required|integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
+            return Response::json(['errors' => $validator->errors()], 422);
+        }
+
+        if (!lmItineraryTableExists()) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        $row = Db::table('quivi_poi_itineraries')->where('id', (int) $id)->whereNull('deleted_at')->first();
+        if (!$row) {
+            return Response::json(['error' => 'Itinerary not found.'], 404);
+        }
+
+        foreach ($request->input('stops') as $item) {
+            Db::table('quivi_poi_itinerary_stops')
+                ->where('id', (int) $item['id'])
+                ->where('itinerary_id', (int) $id)
+                ->update(['sort_order' => (int) $item['sort_order'], 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+
+        $updatedRow = Db::table('quivi_poi_itineraries')->where('id', (int) $id)->first();
+        return Response::json(lmItineraryResponse($updatedRow, true));
+    });
+});
