@@ -1,0 +1,19 @@
+<?php /** @var \Quivi\Poi\Models\BookmarkFolder $model */ ?>
+<div class="form-group">
+    <label class="control-label">Utente</label>
+    <div>
+        <?php if ($model->user_id): ?>
+            <a href="<?= Backend::url('winter/user/users/update/' . $model->user_id) ?>"
+               class="btn btn-default btn-sm" target="_blank">
+                <i class="icon-user"></i>
+                <?php if ($model->user): ?>
+                    Apri <?= e(trim($model->user->first_name . ' ' . $model->user->last_name) ?: $model->user->username) ?>
+                <?php else: ?>
+                    Apri utente #<?= $model->user_id ?>
+                <?php endif ?>
+            </a>
+        <?php else: ?>
+            <span class="help-inline">—</span>
+        <?php endif ?>
+    </div>
+</div>

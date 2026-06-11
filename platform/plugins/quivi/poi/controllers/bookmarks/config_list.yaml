@@ -17,3 +17,4 @@ filter:
             options:
                 poi: POI
                 picture: Foto
+                itinerary: Itinerario

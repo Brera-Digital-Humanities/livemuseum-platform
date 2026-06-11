@@ -9,8 +9,13 @@ class Bookmark extends Model
     public $table = 'quivi_poi_bookmarks';
     protected $dates = ['deleted_at'];
 
+    public $belongsTo = [
+        'user'   => [\Winter\User\Models\User::class, 'key' => 'user_id'],
+        'folder' => [BookmarkFolder::class, 'key' => 'folder_id'],
+    ];
+
     public function getTargetTypeOptions()
     {
-        return ['poi' => 'POI', 'picture' => 'Foto'];
+        return ['poi' => 'POI', 'picture' => 'Foto', 'itinerary' => 'Itinerario'];
     }
 }

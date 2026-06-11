@@ -1,0 +1,11 @@
+name: Collection
+form: $/quivi/poi/models/bookmarkfolder/fields.yaml
+modelClass: Quivi\Poi\Models\BookmarkFolder
+
+create:
+    title: Nuova collection
+update:
+    title: Modifica collection
+
+flashSave: Collection salvata.
+flashDelete: Collection eliminata.

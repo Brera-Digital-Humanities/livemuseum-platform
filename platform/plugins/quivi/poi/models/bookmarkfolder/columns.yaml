@@ -7,18 +7,18 @@ columns:
         relation: user
         select: name
         sortable: true
-    target_type:
-        label: Tipo
+    name:
+        label: Nome
         sortable: true
-    target_id:
-        label: Target ID
+        searchable: true
+    is_public:
+        label: Pubblica
+        type: switch
         sortable: true
-    folder_id:
-        label: Collection
-        relation: folder
-        select: name
-        sortable: true
+    bookmarks_count:
+        label: Bookmark
+        type: number
     created_at:
-        label: Data
+        label: Creata il
         type: datetime
         sortable: true

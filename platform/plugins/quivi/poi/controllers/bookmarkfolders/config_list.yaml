@@ -1,0 +1,18 @@
+list: $/quivi/poi/models/bookmarkfolder/columns.yaml
+
+modelClass: Quivi\Poi\Models\BookmarkFolder
+title: Collections (Bookmark folders)
+recordUrl: quivi/poi/bookmarkfolders/update/:id
+recordsPerPage: 50
+
+toolbar:
+    buttons: list_toolbar
+    search:
+        prompt: Cerca collection...
+
+filter:
+    scopes:
+        is_public:
+            label: Pubblica
+            type: switch
+            conditions: is_public = true

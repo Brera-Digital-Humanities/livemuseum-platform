@@ -2476,7 +2476,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Weekend a Milano\"\n}"
+              "raw": "{\n  \"name\": \"Giro Milano\",\n  \"is_public\": true\n}"
             }
           },
           "response": []
@@ -2533,7 +2533,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Arte e monumenti\"\n}"
+              "raw": "{\n  \"name\": \"Nuovo nome\",\n  \"is_public\": false\n}"
             }
           },
           "response": []
@@ -2614,9 +2614,8 @@
                 "value": "application/json"
               },
               {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}",
-                "type": "text"
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
             "url": {
@@ -2631,6 +2630,82 @@
                 "folders",
                 "{{folderId}}"
               ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bookmark itinerary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookmarks/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookmarks",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_type\": \"itinerary\",\n  \"target_id\": \"{{itineraryId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unbookmark itinerary",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bookmarks/delete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bookmarks",
+                "delete"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_type\": \"itinerary\",\n  \"target_id\": \"{{itineraryId}}\"\n}"
             }
           },
           "response": []

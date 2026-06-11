@@ -39,3 +39,6 @@
 1.0.14:
     - 'Add itineraries and itinerary stops tables'
     - itineraries_schema.php
+1.0.15:
+    - 'Add is_public flag to bookmark folders'
+    - bookmark_folders_ispublic.php

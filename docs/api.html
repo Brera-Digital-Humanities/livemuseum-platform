@@ -197,7 +197,7 @@
     <header>
         <main>
             <h1>LiveMuseum API v1</h1>
-            <p class="lead">Documentazione degli endpoint per app mobile LiveMuseum: autenticazione utenti, point of interest, foto, commenti, profili social e bookmark.</p>
+            <p class="lead">Documentazione degli endpoint per app mobile LiveMuseum: autenticazione utenti, point of interest, foto, commenti, profili social, bookmark e itinerari.</p>
             <div class="meta">
                 <span class="pill">Base URL locale: <code>http://localhost:8091</code></span>
                 <span class="pill">Base URL staging: <code>https://platform.staging.livemuseum.it</code></span>
@@ -761,25 +761,48 @@ const { logged } = await fetch('/api/v1/users/check', {
             <p>Foto dell'utente autenticato.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/bookmarks</span> <span class="badge auth">Auth</span></h3>
-            <p>Bookmark dell'utente autenticato, divisi in POI, foto e cartelle.</p>
+            <p>Bookmark dell'utente autenticato, divisi in <code>pois</code>, <code>pictures</code>, <code>itineraries</code> e <code>folders</code>.</p>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/bookmarks/create</span> <span class="badge auth">Auth</span></h3>
-            <p>Crea un bookmark generico. Accetta <code>target_type</code> (<code>poi</code> o <code>picture</code>), <code>target_id</code> e <code>folder_id</code> opzionale. Per compatibilita accetta anche <code>poi_id</code> o <code>picture_id</code>. <code>DELETE /api/v1/bookmarks/delete</code> rimuove lo stesso target.</p>
+            <p>Crea un bookmark generico. Campo <code>target_type</code>: <code>poi</code>, <code>picture</code> o <code>itinerary</code>. Campo <code>target_id</code> obbligatorio. <code>folder_id</code> opzionale. <code>DELETE /api/v1/bookmarks/delete</code> rimuove lo stesso target.</p>
+            <pre><code># Bookmarkare un itinerario
+TOKEN=...
+curl -X POST {{baseUrl}}/api/v1/bookmarks/create \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"target_type":"itinerary","target_id":1}'</code></pre>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/badges</span> <span class="badge auth">Auth</span></h3>
             <p>Badge dell'utente autenticato, inclusi quelli non ancora completati con <code>progress</code> e <code>target</code>.</p>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/users/folders/create</span> <span class="badge auth">Auth</span></h3>
-            <p>Crea una cartella bookmark. Campo richiesto: <code>name</code>.</p>
+            <p>Crea una collection. Campi: <code>name</code> (obbligatorio), <code>is_public</code> (boolean, default <code>false</code>). Risposta include <code>id</code>, <code>name</code>, <code>is_public</code>.</p>
+            <pre><code>TOKEN=...
+curl -X POST {{baseUrl}}/api/v1/users/folders/create \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Giro Milano","is_public":true}'</code></pre>
 
             <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/users/folders/{id}/update</span> <span class="badge auth">Auth</span></h3>
-            <p>Modifica il nome di una cartella bookmark; accetta anche <code>PUT</code>.</p>
+            <p>Modifica <code>name</code> e/o <code>is_public</code> di una collection; accetta anche <code>PUT</code>. Entrambi i campi sono opzionali (almeno uno richiesto).</p>
+            <pre><code>TOKEN=...
+curl -X PATCH {{baseUrl}}/api/v1/users/folders/1/update \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"is_public":false}'</code></pre>
 
             <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/users/folders/{id}/delete</span> <span class="badge auth">Auth</span></h3>
-            <p>Elimina una cartella bookmark dell'utente autenticato.</p>
+            <p>Elimina una collection dell'utente autenticato. I bookmark contenuti vengono de-associati (folder_id = null).</p>
 
-            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/folders/{id}</span> <span class="badge auth">Auth</span></h3>
-            <p>Restituisce tutti i bookmark contenuti nella cartella.</p>
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/folders/{id}</span></h3>
+            <p>Restituisce il contenuto della collection (<code>pois</code>, <code>pictures</code>, <code>itineraries</code>). Se <code>is_public = true</code> è accessibile senza autenticazione; altrimenti richiede che il chiamante sia il proprietario (Bearer token). Risposta include <code>is_public</code>.</p>
+            <pre><code># Accesso pubblico (no token)
+curl {{baseUrl}}/api/v1/users/folders/1
+
+# Accesso privato (owner)
+TOKEN=...
+curl {{baseUrl}}/api/v1/users/folders/1 \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
         </section>
 
         <section>

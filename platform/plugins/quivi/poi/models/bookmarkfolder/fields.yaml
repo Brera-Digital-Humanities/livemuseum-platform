@@ -1,0 +1,33 @@
+fields:
+    user:
+        label: Utente
+        type: recordfinder
+        span: left
+        required: true
+        list: $/winter/user/models/user/columns.yaml
+        recordsPerPage: 15
+        title: Seleziona utente
+        prompt: Cerca utente...
+        nameFrom: name
+        descriptionFrom: email
+        keyFrom: id
+
+    name:
+        label: Nome
+        type: text
+        span: right
+        required: true
+
+    is_public:
+        label: Pubblica
+        type: switch
+        span: left
+        comment: Se attiva, la collection è visibile a tutti senza autenticazione.
+
+tabs:
+    fields:
+        items:
+            label: Elementi
+            type: partial
+            path: $/quivi/poi/partials/bookmarkfolder_items.htm
+            tab: Elementi

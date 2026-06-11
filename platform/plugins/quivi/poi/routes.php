@@ -1211,15 +1211,17 @@ function lmStoredBookmarkFolders($userId)
 
 function lmBookmarkFolderResponse($folder, $userId)
 {
-    $folderId = is_object($folder) ? (int) $folder->id : (int) $folder['id'];
-    $name = is_object($folder) ? $folder->name : $folder['name'];
+    $folderId  = is_object($folder) ? (int) $folder->id : (int) $folder['id'];
+    $name      = is_object($folder) ? $folder->name : $folder['name'];
+    $isPublic  = is_object($folder) ? (bool) ($folder->is_public ?? false) : (bool) ($folder['is_public'] ?? false);
     $baseCount = is_object($folder) ? 0 : (int) ($folder['bookmarks_num'] ?? 0);
 
     return [
-        'id' => $folderId,
-        'name' => $name,
+        'id'            => $folderId,
+        'name'          => $name,
+        'is_public'     => $isPublic,
         'bookmarks_num' => $baseCount + lmEngagementCount('quivi_poi_bookmarks', [
-            'user_id' => (int) $userId,
+            'user_id'   => (int) $userId,
             'folder_id' => $folderId,
         ]),
     ];
@@ -1284,12 +1286,13 @@ function lmNormalizeBookmarkTarget(Request $request, $defaultType = null, $defau
 
     $targetType = strtolower((string) $targetType);
     $aliases = [
-        'pois' => 'poi',
-        'place' => 'poi',
-        'places' => 'poi',
-        'photo' => 'picture',
-        'photos' => 'picture',
-        'pictures' => 'picture',
+        'pois'        => 'poi',
+        'place'       => 'poi',
+        'places'      => 'poi',
+        'photo'       => 'picture',
+        'photos'      => 'picture',
+        'pictures'    => 'picture',
+        'itineraries' => 'itinerary',
     ];
 
     return [
@@ -1308,6 +1311,16 @@ function lmBookmarkTarget($targetType, $targetId)
         return lmMockPicture($targetId);
     }
 
+    if ($targetType === 'itinerary') {
+        if (!lmItineraryTableExists()) {
+            return null;
+        }
+        return Db::table('quivi_poi_itineraries')
+            ->where('id', (int) $targetId)
+            ->whereNull('deleted_at')
+            ->first();
+    }
+
     return null;
 }
 
@@ -1323,13 +1336,21 @@ function lmBookmarkTargetCount($targetType, $targetId)
         return $picture ? (int) $picture['bookmarks_num'] : 0;
     }
 
+    if ($targetType === 'itinerary') {
+        return lmEngagementCount('quivi_poi_bookmarks', [
+            'target_type' => 'itinerary',
+            'target_id'   => (int) $targetId,
+        ]);
+    }
+
     return 0;
 }
 
 function lmUserBookmarks($userId, $folderId = null)
 {
-    $pois = [];
-    $pictures = [];
+    $pois       = [];
+    $pictures   = [];
+    $itineraries = [];
 
     if (lmEngagementTableExists('quivi_poi_bookmarks')) {
         $query = Db::table('quivi_poi_bookmarks')
@@ -1356,25 +1377,37 @@ function lmUserBookmarks($userId, $folderId = null)
                 if ($picture) {
                     $pictures[] = $picture;
                 }
+                continue;
+            }
+
+            if ($bookmark->target_type === 'itinerary' && lmItineraryTableExists()) {
+                $row = Db::table('quivi_poi_itineraries')
+                    ->where('id', (int) $bookmark->target_id)
+                    ->whereNull('deleted_at')
+                    ->first();
+                if ($row) {
+                    $itineraries[] = lmItineraryResponse($row);
+                }
             }
         }
     }
 
     if ($folderId === null) {
-        $pois = array_merge($pois, [lmMockPoi(101), lmMockPoi(105)]);
+        $pois     = array_merge($pois, [lmMockPoi(101), lmMockPoi(105)]);
         $pictures = array_merge($pictures, [lmMockPicture(502)]);
     } elseif ((int) $folderId === 701) {
-        $pois = array_merge($pois, [lmMockPoi(101), lmMockPoi(103)]);
+        $pois     = array_merge($pois, [lmMockPoi(101), lmMockPoi(103)]);
         $pictures = array_merge($pictures, [lmMockPicture(501)]);
     } elseif ((int) $folderId === 702) {
-        $pois = array_merge($pois, [lmMockPoi(105)]);
+        $pois     = array_merge($pois, [lmMockPoi(105)]);
         $pictures = array_merge($pictures, [lmMockPicture(502)]);
     }
 
     return [
-        'pois' => lmUniqueItemsById(array_values(array_filter($pois))),
-        'pictures' => lmUniqueItemsById(array_values(array_filter($pictures))),
-        'folders' => $folderId === null ? lmBookmarkFolders($userId) : [],
+        'pois'        => lmUniqueItemsById(array_values(array_filter($pois))),
+        'pictures'    => lmUniqueItemsById(array_values(array_filter($pictures))),
+        'itineraries' => lmUniqueItemsById(array_values(array_filter($itineraries))),
+        'folders'     => $folderId === null ? lmBookmarkFolders($userId) : [],
     ];
 }
 
@@ -2015,9 +2048,9 @@ function lmSetBookmark(Request $request, $bookmarked, $defaultType = null, $defa
     $target = lmNormalizeBookmarkTarget($request, $defaultType, $defaultId);
 
     $validator = Validator::make(array_merge($request->all(), $target), [
-        'target_type' => 'required|string|in:poi,picture',
-        'target_id' => 'required|integer|min:1',
-        'folder_id' => 'nullable|integer',
+        'target_type' => 'required|string|in:poi,picture,itinerary',
+        'target_id'   => 'required|integer|min:1',
+        'folder_id'   => 'nullable|integer',
     ]);
 
     if ($validator->fails()) {
@@ -2028,7 +2061,7 @@ function lmSetBookmark(Request $request, $bookmarked, $defaultType = null, $defa
         return Response::json(['error' => 'Bookmark target not found.'], 404);
     }
 
-    $userId = lmMockCurrentUserId($request);
+    $userId = (int) $request->attributes->get('api_user')->id;
     $folderId = $request->filled('folder_id') ? (int) $request->input('folder_id') : null;
 
     if (!lmBookmarkFolderExists($userId, $folderId)) {
@@ -2981,7 +3014,8 @@ Route::group(['prefix' => 'api/v1/users'], function () {
 
         Route::post('folders/create', function (Request $request) {
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|between:2,255',
+                'name'      => 'required|string|between:2,255',
+                'is_public' => 'nullable|boolean',
             ]);
 
             if ($validator->fails()) {
@@ -2993,19 +3027,26 @@ Route::group(['prefix' => 'api/v1/users'], function () {
             }
 
             $now = date('Y-m-d H:i:s');
-            $id = Db::table('quivi_poi_bookmark_folders')->insertGetId([
+            $id  = Db::table('quivi_poi_bookmark_folders')->insertGetId([
                 'user_id'    => (int) $request->attributes->get('api_user')->id,
                 'name'       => $request->input('name'),
+                'is_public'  => $request->boolean('is_public', false),
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
 
-            return Response::json(['status' => 'OK', 'id' => $id, 'name' => $request->input('name')], 201);
+            return Response::json([
+                'status'    => 'OK',
+                'id'        => $id,
+                'name'      => $request->input('name'),
+                'is_public' => $request->boolean('is_public', false),
+            ], 201);
         });
 
         Route::match(['put', 'patch'], 'folders/{id}/update', function (Request $request, $id) {
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|between:2,255',
+                'name'      => 'sometimes|required|string|between:2,255',
+                'is_public' => 'nullable|boolean',
             ]);
 
             if ($validator->fails()) {
@@ -3015,23 +3056,30 @@ Route::group(['prefix' => 'api/v1/users'], function () {
             $userId = (int) $request->attributes->get('api_user')->id;
 
             if (lmEngagementTableExists('quivi_poi_bookmark_folders')) {
+                $fields = ['updated_at' => date('Y-m-d H:i:s')];
+                if ($request->has('name'))      $fields['name']      = $request->input('name');
+                if ($request->has('is_public')) $fields['is_public'] = $request->boolean('is_public');
+
                 $updated = Db::table('quivi_poi_bookmark_folders')
                     ->where('id', (int) $id)
                     ->where('user_id', $userId)
                     ->whereNull('deleted_at')
-                    ->update([
-                        'name'       => $request->input('name'),
-                        'updated_at' => date('Y-m-d H:i:s'),
-                    ]);
+                    ->update($fields);
 
                 if ($updated) {
-                    return Response::json(['status' => 'OK', 'id' => (int) $id, 'name' => $request->input('name')]);
+                    $row = Db::table('quivi_poi_bookmark_folders')->where('id', (int) $id)->first();
+                    return Response::json([
+                        'status'    => 'OK',
+                        'id'        => (int) $id,
+                        'name'      => $row->name,
+                        'is_public' => (bool) $row->is_public,
+                    ]);
                 }
             }
 
             foreach (lmMockBookmarkFolderDefinitions() as $folder) {
                 if ((int) $folder['id'] === (int) $id) {
-                    return Response::json(['status' => 'OK', 'id' => (int) $id, 'name' => $request->input('name')]);
+                    return Response::json(['status' => 'OK', 'id' => (int) $id]);
                 }
             }
 
@@ -3076,31 +3124,49 @@ Route::group(['prefix' => 'api/v1/users'], function () {
             return Response::json(['error' => 'Bookmark folder not found.'], 404);
         });
 
-        Route::get('folders/{id}', function (Request $request, $id) {
-            $userId = (int) $request->attributes->get('api_user')->id;
-
-            if (!lmBookmarkFolderExists($userId, (int) $id)) {
-                return Response::json(['error' => 'Bookmark folder not found.'], 404);
-            }
-
-            $bookmarks = lmUserBookmarks($userId, (int) $id);
-            unset($bookmarks['folders']);
-
-            $folderName = 'Bookmark';
-            foreach (lmBookmarkFolders($userId) as $folder) {
-                if ((int) $folder['id'] === (int) $id) {
-                    $folderName = $folder['name'];
-                    break;
-                }
-            }
-
-            return Response::json([
-                'id'        => (int) $id,
-                'name'      => $folderName,
-                'bookmarks' => $bookmarks,
-            ]);
-        })->where('id', '[0-9]+');
     });
+
+    // GET folders/{id} — public folders accessible without auth
+    Route::get('folders/{id}', function (Request $request, $id) {
+        if (!lmEngagementTableExists('quivi_poi_bookmark_folders')) {
+            return Response::json(['error' => 'Bookmark folder not found.'], 404);
+        }
+
+        $folder = Db::table('quivi_poi_bookmark_folders')
+            ->where('id', (int) $id)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if (!$folder) {
+            return Response::json(['error' => 'Bookmark folder not found.'], 404);
+        }
+
+        // Resolve calling user (optional auth)
+        $callerUserId = null;
+        $middleware   = new \Quivi\Profile\Classes\JwtMiddleware();
+        $middleware->handle($request, function ($req) use (&$callerUserId) {
+            $user = $req->attributes->get('api_user');
+            if ($user) {
+                $callerUserId = (int) $user->id;
+            }
+        });
+
+        $isOwner = $callerUserId && $callerUserId === (int) $folder->user_id;
+
+        if (!$folder->is_public && !$isOwner) {
+            return Response::json(['error' => 'Forbidden.'], 403);
+        }
+
+        $bookmarks = lmUserBookmarks((int) $folder->user_id, (int) $id);
+        unset($bookmarks['folders']);
+
+        return Response::json([
+            'id'        => (int) $id,
+            'name'      => $folder->name,
+            'is_public' => (bool) $folder->is_public,
+            'bookmarks' => $bookmarks,
+        ]);
+    })->where('id', '[0-9]+');
 
     Route::get('{id}/profile', function ($id) {
         return Response::json([

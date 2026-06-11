@@ -1,0 +1,101 @@
+<?php
+/** @var \Quivi\Poi\Models\BookmarkFolder $model */
+if (!$model->exists): ?>
+    <p class="help-block" style="padding:12px 0">Salva prima la collection per poter aggiungere elementi.</p>
+<?php return; endif;
+
+$bookmarks = $model->bookmarks()->whereNull('deleted_at')->orderBy('created_at', 'desc')->get();
+
+function lmBackendItemLabel($bookmark) {
+    if ($bookmark->target_type === 'poi') {
+        $row = \Db::table('quivi_poi_pois')->select('id','title')->where('id', $bookmark->target_id)->first();
+        return ['type' => 'POI', 'label' => $row ? e($row->title) : 'POI #'.$bookmark->target_id, 'url' => \Backend::url('quivi/poi/pois/update/'.$bookmark->target_id)];
+    }
+    if ($bookmark->target_type === 'picture') {
+        $row = \Db::table('quivi_poi_pictures')->select('id','caption')->where('id', $bookmark->target_id)->first();
+        return ['type' => 'Foto', 'label' => $row ? (e($row->caption) ?: 'Foto #'.$bookmark->target_id) : 'Foto #'.$bookmark->target_id, 'url' => \Backend::url('quivi/poi/pictures/update/'.$bookmark->target_id)];
+    }
+    if ($bookmark->target_type === 'itinerary') {
+        $row = \Db::table('quivi_poi_itineraries')->select('id','title')->where('id', $bookmark->target_id)->whereNull('deleted_at')->first();
+        return ['type' => 'Itinerario', 'label' => $row ? e($row->title) : 'Itinerario #'.$bookmark->target_id, 'url' => \Backend::url('quivi/poi/itineraries/update/'.$bookmark->target_id)];
+    }
+    return ['type' => ucfirst($bookmark->target_type), 'label' => '#'.$bookmark->target_id, 'url' => null];
+}
+?>
+
+<div id="bookmarkfolder-items-<?= $model->id ?>">
+
+    <?php if ($bookmarks->isEmpty()): ?>
+        <p class="help-block" style="padding:8px 0">Nessun elemento ancora.</p>
+    <?php else: ?>
+        <table class="table data" style="margin-bottom:16px">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Elemento</th>
+                    <th style="width:60px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($bookmarks as $bookmark):
+                    $info = lmBackendItemLabel($bookmark);
+                ?>
+                <tr>
+                    <td><span class="badge"><?= $info['type'] ?></span></td>
+                    <td>
+                        <?php if ($info['url']): ?>
+                            <a href="<?= $info['url'] ?>" target="_blank"><?= $info['label'] ?></a>
+                        <?php else: ?>
+                            <?= $info['label'] ?>
+                        <?php endif ?>
+                    </td>
+                    <td>
+                        <button type="button"
+                            class="btn btn-xs btn-danger"
+                            data-request="onRemoveBookmarkItem"
+                            data-request-data="bookmark_id: <?= $bookmark->id ?>, folder_id: <?= $model->id ?>"
+                            data-request-confirm="Rimuovere questo elemento?">
+                            <i class="icon-times"></i>
+                        </button>
+                    </td>
+                </tr>
+                <?php endforeach ?>
+            </tbody>
+        </table>
+    <?php endif ?>
+
+    <div class="widget-toolbar" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:12px;background:#f5f5f5;border-radius:4px">
+        <div class="form-group" style="margin:0;min-width:140px">
+            <label class="control-label">Tipo</label>
+            <select id="add-item-type-<?= $model->id ?>" class="form-control" style="width:100%">
+                <option value="poi">POI</option>
+                <option value="picture">Foto</option>
+                <option value="itinerary">Itinerario</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin:0;min-width:180px">
+            <label class="control-label">ID elemento</label>
+            <input type="number" id="add-item-id-<?= $model->id ?>"
+                   class="form-control" placeholder="es. 42" min="1" style="width:100%">
+        </div>
+        <div class="form-group" style="margin:0">
+            <label class="control-label">&nbsp;</label>
+            <button type="button" class="btn btn-primary btn-sm" style="display:block"
+                onclick="(function(){
+                    var type = document.getElementById('add-item-type-<?= $model->id ?>').value;
+                    var id   = document.getElementById('add-item-id-<?= $model->id ?>').value;
+                    if (!id) { alert('Inserisci un ID.'); return; }
+                    $.request('onAddBookmarkItem', {
+                        data: { folder_id: <?= $model->id ?>, target_type: type, target_id: id },
+                        success: function() {
+                            document.getElementById('add-item-id-<?= $model->id ?>').value = '';
+                            window.location.reload();
+                        }
+                    });
+                })()">
+                <i class="icon-plus"></i> Aggiungi
+            </button>
+        </div>
+    </div>
+
+</div>
