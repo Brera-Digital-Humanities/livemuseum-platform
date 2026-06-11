@@ -1,0 +1,10 @@
+list: $/quivi/poi/models/commentreport/columns.yaml
+
+modelClass: Quivi\Poi\Models\CommentReport
+title: Segnalazioni commenti
+recordUrl: quivi/poi/reports/update/:id
+recordsPerPage: 50
+
+toolbar:
+    search:
+        prompt: Cerca...

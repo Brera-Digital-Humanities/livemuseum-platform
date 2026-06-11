@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use System\Models\File as SystemFile;
+use Quivi\Profile\Classes\JwtMiddleware;
 
 function lmMockBadges()
 {
@@ -870,9 +871,71 @@ function lmCommentTableExists()
     return $exists;
 }
 
+const COMMENT_AUTOHIDE_REPORTS = 3;
+
 function lmCommentLikesNum($commentId, $base = 0)
 {
     return (int) $base + lmEngagementCount('quivi_poi_comment_likes', ['comment_id' => (int) $commentId]);
+}
+
+function lmCommentReportsTableExists()
+{
+    static $exists = null;
+    if ($exists === null) {
+        $exists = Schema::hasTable('quivi_poi_comment_reports');
+    }
+    return $exists;
+}
+
+function lmApplyCommentReport($commentId, $userId, $add)
+{
+    if (!lmCommentReportsTableExists()) {
+        return false;
+    }
+    $commentId = (int) $commentId;
+    $userId    = (int) $userId;
+
+    $exists = Db::table('quivi_poi_comment_reports')
+        ->where('comment_id', $commentId)
+        ->where('user_id', $userId)
+        ->exists();
+
+    if ($add && !$exists) {
+        Db::table('quivi_poi_comment_reports')->insert([
+            'comment_id' => $commentId,
+            'user_id'    => $userId,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+        $count = Db::table('quivi_poi_comments')->where('id', $commentId)->value('reports_count') + 1;
+        $hidden = $count >= COMMENT_AUTOHIDE_REPORTS;
+        Db::table('quivi_poi_comments')->where('id', $commentId)->update([
+            'reports_count' => $count,
+            'is_hidden'     => $hidden,
+        ]);
+        return ['reported' => true, 'reports_count' => $count, 'is_hidden' => $hidden];
+    }
+
+    if (!$add && $exists) {
+        Db::table('quivi_poi_comment_reports')
+            ->where('comment_id', $commentId)
+            ->where('user_id', $userId)
+            ->delete();
+        $count = max(0, Db::table('quivi_poi_comments')->where('id', $commentId)->value('reports_count') - 1);
+        $hidden = $count >= COMMENT_AUTOHIDE_REPORTS;
+        Db::table('quivi_poi_comments')->where('id', $commentId)->update([
+            'reports_count' => $count,
+            'is_hidden'     => $hidden,
+        ]);
+        return ['reported' => false, 'reports_count' => $count, 'is_hidden' => $hidden];
+    }
+
+    $current = Db::table('quivi_poi_comments')->where('id', $commentId)->first();
+    return [
+        'reported'      => $exists,
+        'reports_count' => $current ? (int) $current->reports_count : 0,
+        'is_hidden'     => $current ? (bool) $current->is_hidden : false,
+    ];
 }
 
 function lmCommentResponse($row)
@@ -890,9 +953,11 @@ function lmCommentResponse($row)
         'rating'       => $rating,
         'comment_date' => $row->created_at,
         'likes_num'    => $likesNum,
-        'likes'        => ['users' => lmEngagementUsers('quivi_poi_comment_likes', ['comment_id' => (int) $row->id], [])],
-        'comments_num' => (int) Db::table('quivi_poi_comments')->where('parent_id', $row->id)->whereNull('deleted_at')->count(),
-        'comments'     => [],
+        'likes'         => ['users' => lmEngagementUsers('quivi_poi_comment_likes', ['comment_id' => (int) $row->id], [])],
+        'comments_num'  => (int) Db::table('quivi_poi_comments')->where('parent_id', $row->id)->whereNull('deleted_at')->count(),
+        'comments'      => [],
+        'reports_count' => isset($row->reports_count) ? (int) $row->reports_count : 0,
+        'is_hidden'     => isset($row->is_hidden) ? (bool) $row->is_hidden : false,
     ];
 }
 
@@ -2851,6 +2916,38 @@ Route::group(['prefix' => 'api/v1/comments'], function () {
         $row = Db::table('quivi_poi_comments')->where('id', (int) $id)->first();
 
         return Response::json(lmCommentResponse($row));
+    });
+
+    Route::group(['middleware' => [JwtMiddleware::class]], function () {
+        Route::post('{id}/report', function (Request $request, $id) {
+            $commentId = (int) $id;
+            if ($commentId <= 0) {
+                return Response::json(['error' => 'Comment not found.'], 404);
+            }
+            if (!lmCommentTableExists()) {
+                return Response::json(['error' => 'Comments storage is not available.'], 500);
+            }
+            $comment = Db::table('quivi_poi_comments')->where('id', $commentId)->whereNull('deleted_at')->first();
+            if (!$comment) {
+                return Response::json(['error' => 'Comment not found.'], 404);
+            }
+            $userId = (int) $request->attributes->get('api_user')->id;
+            $result = lmApplyCommentReport($commentId, $userId, true);
+            return Response::json(array_merge(['comment_id' => $commentId], $result), 201);
+        });
+
+        Route::delete('{id}/report', function (Request $request, $id) {
+            $commentId = (int) $id;
+            if ($commentId <= 0) {
+                return Response::json(['error' => 'Comment not found.'], 404);
+            }
+            if (!lmCommentTableExists()) {
+                return Response::json(['error' => 'Comments storage is not available.'], 500);
+            }
+            $userId = (int) $request->attributes->get('api_user')->id;
+            $result = lmApplyCommentReport($commentId, $userId, false);
+            return Response::json(array_merge(['comment_id' => $commentId], $result));
+        });
     });
 });
 

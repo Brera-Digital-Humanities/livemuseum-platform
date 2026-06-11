@@ -164,6 +164,17 @@
         .method.patch { background: var(--patch); }
         .method.delete { background: var(--delete); }
 
+        .badge.auth {
+            background: #6366f1;
+            color: #fff;
+            border-radius: 4px;
+            padding: 3px 7px;
+            font-size: 11px;
+            font-weight: 700;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+
         .path {
             font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
             font-weight: 700;
@@ -306,6 +317,53 @@
   "expires_in": 3600,
   "user": {}
 }</code></pre>
+        </section>
+
+        <section>
+            <h2>Flusso autenticazione — test rapido</h2>
+            <pre><code># 1. LOGIN — ottieni il token
+curl -s -X POST http://localhost:8091/api/v1/users/login \
+  -H "Content-Type: application/json" \
+  -d '{"login":"test@tester.the","password":"password123"}'
+# → {"access_token":"eyJ...","user":{...}}
+
+# Salva il token in una variabile per i comandi successivi
+TOKEN="eyJ..."
+
+# 2. VERIFICA SE LOGGATO — senza token
+curl -s http://localhost:8091/api/v1/users/check
+# → {"logged":false}
+
+# Verifica con token
+curl -s http://localhost:8091/api/v1/users/check \
+  -H "Authorization: Bearer $TOKEN"
+# → {"logged":true,"user_id":5,"username":"test@tester.the"}
+
+# 3. CREA UN COMMENTO (serve un id da segnalare)
+curl -s -X POST http://localhost:8091/api/v1/comments/1/create \
+  -H "Content-Type: application/json" \
+  -d '{"comment_text":"Commento di test"}'
+# → {"id":9,...}
+
+# 4. SEGNALA IL COMMENTO — richiede token
+curl -s -X POST http://localhost:8091/api/v1/comments/9/report \
+  -H "Authorization: Bearer $TOKEN"
+# → {"comment_id":9,"reported":true,"reports_count":1,"is_hidden":false}
+
+# 5. RIMUOVI LA SEGNALAZIONE
+curl -s -X DELETE http://localhost:8091/api/v1/comments/9/report \
+  -H "Authorization: Bearer $TOKEN"
+# → {"comment_id":9,"reported":false,"reports_count":0,"is_hidden":false}
+
+# 6. LOGOUT — invalida il token
+curl -s -X POST http://localhost:8091/api/v1/users/logout \
+  -H "Authorization: Bearer $TOKEN"
+# → {"success":true}
+
+# Dopo logout il token non è più valido
+curl -s http://localhost:8091/api/v1/users/check \
+  -H "Authorization: Bearer $TOKEN"
+# → {"logged":false}</code></pre>
         </section>
 
         <section>
@@ -644,6 +702,51 @@ curl "http://localhost:8091/api/v1/pois/all" \
 
             <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/comments/{id}/update</span></h3>
             <p>Aggiorna <code>comment_text</code>; accetta anche <code>PUT</code>.</p>
+
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/report</span> <span class="badge auth">Auth</span></h3>
+            <p>Segnala un commento. Richiede <code>Authorization: Bearer &lt;token&gt;</code>. Incrementa <code>reports_count</code> sul commento; se raggiunge <code>3</code> imposta automaticamente <code>is_hidden: true</code>. Un utente può segnalare un commento una sola volta.</p>
+            <pre><code>curl -X POST http://localhost:8091/api/v1/comments/8/report \
+  -H "Authorization: Bearer TOKEN"</code></pre>
+            <pre><code>// Risposta 201
+{ "comment_id": 8, "reported": true, "reports_count": 1, "is_hidden": false }
+
+// 401 se token assente o non valido
+{ "error": "Token missing." }</code></pre>
+
+            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/comments/{id}/report</span> <span class="badge auth">Auth</span></h3>
+            <p>Rimuove la propria segnalazione. Decrementa <code>reports_count</code>; se scende sotto <code>3</code> ripristina <code>is_hidden: false</code>.</p>
+            <pre><code>curl -X DELETE http://localhost:8091/api/v1/comments/8/report \
+  -H "Authorization: Bearer TOKEN"</code></pre>
+            <pre><code>// Risposta 200
+{ "comment_id": 8, "reported": false, "reports_count": 0, "is_hidden": false }</code></pre>
+
+            <h4>Come usare il token sul frontend</h4>
+            <p>Il token viene restituito da <code>POST /api/v1/users/login</code> nel campo <code>access_token</code>. Va salvato in <code>localStorage</code> e passato come header <code>Authorization</code> ad ogni chiamata autenticata.</p>
+            <pre><code>// 1. Login e salvataggio token
+const { access_token } = await fetch('/api/v1/users/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ login: 'email@example.com', password: '...' })
+}).then(r => r.json())
+// access_token === "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+
+localStorage.setItem('access_token', access_token)
+
+// 2. Segnala commento
+const token = localStorage.getItem('access_token')
+// token === "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+
+await fetch(`/api/v1/comments/${commentId}/report`, {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` }
+  // Authorization: "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+})
+
+// 3. Verifica se loggato (non richiede auth)
+const { logged } = await fetch('/api/v1/users/check', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json())
+// logged === true</code></pre>
         </section>
 
         <section>

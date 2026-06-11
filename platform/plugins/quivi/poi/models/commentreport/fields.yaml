@@ -1,0 +1,14 @@
+fields:
+    comment_id:
+        label: Commento ID
+        span: left
+        disabled: true
+    user_id:
+        label: Utente ID
+        span: right
+        disabled: true
+    created_at:
+        label: Data segnalazione
+        type: datepicker
+        mode: datetime
+        disabled: true

@@ -218,6 +218,20 @@ Route::group(['prefix' => 'api/v1/users'], function () {
         return Response::json(['success' => true]);
     });
 
+    Route::get('check', function (Request $request) {
+        $response = null;
+        $middleware = new JwtMiddleware();
+        $middleware->handle($request, function ($req) use (&$response) {
+            $user = $req->attributes->get('api_user');
+            $response = Response::json([
+                'logged'    => true,
+                'user_id'   => $user->id,
+                'username'  => $user->username,
+            ]);
+        });
+        return $response ?? Response::json(['logged' => false]);
+    });
+
     Route::group(['middleware' => [JwtMiddleware::class]], function () {
         Route::get('logged', function (Request $request) {
             return Response::json(UserResource::make($request->attributes->get('api_user')));

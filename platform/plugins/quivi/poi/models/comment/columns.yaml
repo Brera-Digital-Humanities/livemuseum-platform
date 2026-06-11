@@ -23,6 +23,12 @@ columns:
         label: Risposta a
         type: partial
         path: $/quivi/poi/partials/_comment_parent.htm
+    reports_count:
+        label: Segnalazioni
+        sortable: true
+    is_hidden:
+        label: Nascosto
+        type: switch
     created_at:
         label: Data
         type: datetime

@@ -83,6 +83,12 @@ class Plugin extends PluginBase
                         'icon'        => 'icon-thumbs-up',
                         'permissions' => ['quivi.poi.commentlikes'],
                     ],
+                    'reports' => [
+                        'label'       => 'Segnalazioni',
+                        'url'         => Backend::url('quivi/poi/reports'),
+                        'icon'        => 'icon-flag',
+                        'permissions' => ['quivi.poi.reports'],
+                    ],
                 ],
             ],
         ];
@@ -110,6 +116,10 @@ class Plugin extends PluginBase
             'quivi.poi.commentlikes' => [
                 'tab'   => 'LiveMuseum',
                 'label' => 'Visualizzazione like commenti',
+            ],
+            'quivi.poi.reports' => [
+                'tab'   => 'LiveMuseum',
+                'label' => 'Gestione segnalazioni',
             ],
         ];
     }

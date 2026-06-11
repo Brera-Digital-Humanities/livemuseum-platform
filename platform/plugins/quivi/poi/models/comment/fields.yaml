@@ -38,3 +38,12 @@ fields:
         label: Testo commento
         type: textarea
         required: true
+    reports_count:
+        label: Numero segnalazioni
+        type: number
+        span: left
+        disabled: true
+    is_hidden:
+        label: Nascosto automaticamente
+        type: switch
+        span: right

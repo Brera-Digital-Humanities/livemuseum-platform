@@ -1,0 +1,8 @@
+name: Segnalazione
+form: $/quivi/poi/models/commentreport/fields.yaml
+modelClass: Quivi\Poi\Models\CommentReport
+
+update:
+    title: Dettaglio segnalazione
+
+flashSave: Segnalazione salvata.
