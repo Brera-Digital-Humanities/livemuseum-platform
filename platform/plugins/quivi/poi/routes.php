@@ -2629,20 +2629,22 @@ Route::group(['prefix' => 'api/v1/pictures'], function () {
         return Response::json($picture);
     });
 
-    Route::post('{id}/like', function (Request $request, $id) {
-        return lmSetPictureLike($request, $id, true);
-    });
+    Route::group(['middleware' => [JwtMiddleware::class]], function () {
+        Route::post('{id}/like', function (Request $request, $id) {
+            return lmSetPictureLike($request, $id, true);
+        });
 
-    Route::delete('{id}/like', function (Request $request, $id) {
-        return lmSetPictureLike($request, $id, false);
-    });
+        Route::delete('{id}/like', function (Request $request, $id) {
+            return lmSetPictureLike($request, $id, false);
+        });
 
-    Route::post('{id}/bookmark', function (Request $request, $id) {
-        return lmSetBookmark($request, true, 'picture', $id);
-    });
+        Route::post('{id}/bookmark', function (Request $request, $id) {
+            return lmSetBookmark($request, true, 'picture', $id);
+        });
 
-    Route::delete('{id}/bookmark', function (Request $request, $id) {
-        return lmSetBookmark($request, false, 'picture', $id);
+        Route::delete('{id}/bookmark', function (Request $request, $id) {
+            return lmSetBookmark($request, false, 'picture', $id);
+        });
     });
 
     Route::post('create', function (Request $request) {
@@ -2785,140 +2787,133 @@ Route::group(['prefix' => 'api/v1/pictures'], function () {
 });
 
 Route::group(['prefix' => 'api/v1/comments'], function () {
-    // POST /comments/{targetId}/create — {targetId} is poi or picture id
-    Route::post('{targetId}/create', function (Request $request, $targetId) {
-        $validator = Validator::make($request->all(), [
-            'comment_text' => 'required|string|between:1,1000',
-            'target_type'  => 'nullable|string|in:poi,picture',
-            'parent_id'    => 'nullable|integer|min:1',
-            'kind'         => 'nullable|string|in:comment,review',
-            'rating'       => 'nullable|integer|min:1|max:5',
-        ]);
-
-        if ($validator->fails()) {
-            return Response::json(['errors' => $validator->errors()], 422);
-        }
-
-        $userId     = lmMockCurrentUserId($request);
-        $targetType = $request->input('target_type', 'poi');
-        $parentId   = $request->input('parent_id') ? (int) $request->input('parent_id') : null;
-        $now        = date('Y-m-d H:i:s');
-
-        if (!lmCommentTableExists()) {
-            return Response::json(['error' => 'Comments storage is not available.'], 500);
-        }
-
-        $kind   = $request->input('kind', 'comment');
-        $rating = ($kind === 'review' && $request->filled('rating'))
-            ? (int) $request->input('rating')
-            : null;
-
-        $id = Db::table('quivi_poi_comments')->insertGetId([
-            'target_type'  => $targetType,
-            'target_id'    => (int) $targetId,
-            'parent_id'    => $parentId,
-            'user_id'      => $userId,
-            'comment_text' => $request->input('comment_text'),
-            'kind'         => $kind,
-            'rating'       => $rating,
-            'created_at'   => $now,
-            'updated_at'   => $now,
-        ]);
-
-        $row = Db::table('quivi_poi_comments')->where('id', $id)->first();
-
-        return Response::json(lmCommentResponse($row), 201);
-    });
-
     Route::get('{id}/likes', function (Request $request, $id) {
         $commentId = (int) $id;
         if ($commentId <= 0) {
             return Response::json(['error' => 'Comment not found.'], 404);
         }
-        $currentUserId = lmMockCurrentUserId($request);
         $likesNum = lmCommentLikesNum($commentId);
-        $liked = Db::table('quivi_poi_comment_likes')
-            ->where('comment_id', $commentId)
-            ->where('user_id', $currentUserId)
-            ->exists();
         $users = lmEngagementUsers('quivi_poi_comment_likes', ['comment_id' => $commentId], []);
         return Response::json([
             'comment_id' => $commentId,
             'likes_num'  => $likesNum,
-            'liked'      => $liked,
             'users'      => $users,
         ]);
     });
 
-    Route::post('{id}/like', function (Request $request, $id) {
-        return lmSetCommentLike($request, $id, true);
-    });
-
-    Route::delete('{id}/like', function (Request $request, $id) {
-        return lmSetCommentLike($request, $id, false);
-    });
-
-    Route::delete('{id}/delete', function (Request $request, $id) {
-        if (!lmCommentTableExists()) {
-            return Response::json(['error' => 'Comments storage is not available.'], 500);
-        }
-
-        $comment = Db::table('quivi_poi_comments')
-            ->where('id', (int) $id)
-            ->whereNull('deleted_at')
-            ->first();
-
-        if (!$comment) {
-            return Response::json(['error' => 'Comment not found.'], 404);
-        }
-
-        if ((int) $comment->user_id !== lmMockCurrentUserId($request)) {
-            return Response::json(['error' => 'Forbidden.'], 403);
-        }
-
-        Db::table('quivi_poi_comments')
-            ->where('id', (int) $id)
-            ->update(['deleted_at' => date('Y-m-d H:i:s')]);
-
-        return Response::json(['success' => true, 'id' => (int) $id]);
-    });
-
-    Route::match(['put', 'patch'], '{id}/update', function (Request $request, $id) {
-        $validator = Validator::make($request->all(), [
-            'comment_text' => 'required|string|between:1,1000',
-        ]);
-
-        if ($validator->fails()) {
-            return Response::json(['errors' => $validator->errors()], 422);
-        }
-
-        if (!lmCommentTableExists()) {
-            return Response::json(['error' => 'Comments storage is not available.'], 500);
-        }
-
-        $comment = Db::table('quivi_poi_comments')
-            ->where('id', (int) $id)
-            ->whereNull('deleted_at')
-            ->first();
-
-        if (!$comment) {
-            return Response::json(['error' => 'Comment not found.'], 404);
-        }
-
-        if ((int) $comment->user_id !== lmMockCurrentUserId($request)) {
-            return Response::json(['error' => 'Forbidden.'], 403);
-        }
-
-        Db::table('quivi_poi_comments')
-            ->where('id', (int) $id)
-            ->update(['comment_text' => $request->input('comment_text'), 'updated_at' => date('Y-m-d H:i:s')]);
-
-        $row = Db::table('quivi_poi_comments')->where('id', (int) $id)->first();
-
-        return Response::json(lmCommentResponse($row));
-    });
-
     Route::group(['middleware' => [JwtMiddleware::class]], function () {
+        Route::post('{targetId}/create', function (Request $request, $targetId) {
+            $validator = Validator::make($request->all(), [
+                'comment_text' => 'required|string|between:1,1000',
+                'target_type'  => 'nullable|string|in:poi,picture',
+                'parent_id'    => 'nullable|integer|min:1',
+                'kind'         => 'nullable|string|in:comment,review',
+                'rating'       => 'nullable|integer|min:1|max:5',
+            ]);
+
+            if ($validator->fails()) {
+                return Response::json(['errors' => $validator->errors()], 422);
+            }
+
+            $userId     = (int) $request->attributes->get('api_user')->id;
+            $targetType = $request->input('target_type', 'poi');
+            $parentId   = $request->input('parent_id') ? (int) $request->input('parent_id') : null;
+            $now        = date('Y-m-d H:i:s');
+
+            if (!lmCommentTableExists()) {
+                return Response::json(['error' => 'Comments storage is not available.'], 500);
+            }
+
+            $kind   = $request->input('kind', 'comment');
+            $rating = ($kind === 'review' && $request->filled('rating'))
+                ? (int) $request->input('rating')
+                : null;
+
+            $id = Db::table('quivi_poi_comments')->insertGetId([
+                'target_type'  => $targetType,
+                'target_id'    => (int) $targetId,
+                'parent_id'    => $parentId,
+                'user_id'      => $userId,
+                'comment_text' => $request->input('comment_text'),
+                'kind'         => $kind,
+                'rating'       => $rating,
+                'created_at'   => $now,
+                'updated_at'   => $now,
+            ]);
+
+            $row = Db::table('quivi_poi_comments')->where('id', $id)->first();
+
+            return Response::json(lmCommentResponse($row), 201);
+        });
+
+        Route::post('{id}/like', function (Request $request, $id) {
+            return lmSetCommentLike($request, $id, true);
+        });
+
+        Route::delete('{id}/like', function (Request $request, $id) {
+            return lmSetCommentLike($request, $id, false);
+        });
+
+        Route::delete('{id}/delete', function (Request $request, $id) {
+            if (!lmCommentTableExists()) {
+                return Response::json(['error' => 'Comments storage is not available.'], 500);
+            }
+
+            $comment = Db::table('quivi_poi_comments')
+                ->where('id', (int) $id)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$comment) {
+                return Response::json(['error' => 'Comment not found.'], 404);
+            }
+
+            if ((int) $comment->user_id !== (int) $request->attributes->get('api_user')->id) {
+                return Response::json(['error' => 'Forbidden.'], 403);
+            }
+
+            Db::table('quivi_poi_comments')
+                ->where('id', (int) $id)
+                ->update(['deleted_at' => date('Y-m-d H:i:s')]);
+
+            return Response::json(['success' => true, 'id' => (int) $id]);
+        });
+
+        Route::match(['put', 'patch'], '{id}/update', function (Request $request, $id) {
+            $validator = Validator::make($request->all(), [
+                'comment_text' => 'required|string|between:1,1000',
+            ]);
+
+            if ($validator->fails()) {
+                return Response::json(['errors' => $validator->errors()], 422);
+            }
+
+            if (!lmCommentTableExists()) {
+                return Response::json(['error' => 'Comments storage is not available.'], 500);
+            }
+
+            $comment = Db::table('quivi_poi_comments')
+                ->where('id', (int) $id)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$comment) {
+                return Response::json(['error' => 'Comment not found.'], 404);
+            }
+
+            if ((int) $comment->user_id !== (int) $request->attributes->get('api_user')->id) {
+                return Response::json(['error' => 'Forbidden.'], 403);
+            }
+
+            Db::table('quivi_poi_comments')
+                ->where('id', (int) $id)
+                ->update(['comment_text' => $request->input('comment_text'), 'updated_at' => date('Y-m-d H:i:s')]);
+
+            $row = Db::table('quivi_poi_comments')->where('id', (int) $id)->first();
+
+            return Response::json(lmCommentResponse($row));
+        });
+
         Route::post('{id}/report', function (Request $request, $id) {
             $commentId = (int) $id;
             if ($commentId <= 0) {
@@ -2951,7 +2946,7 @@ Route::group(['prefix' => 'api/v1/comments'], function () {
     });
 });
 
-Route::group(['prefix' => 'api/v1/bookmarks'], function () {
+Route::group(['prefix' => 'api/v1/bookmarks', 'middleware' => [JwtMiddleware::class]], function () {
     Route::post('create', function (Request $request) {
         return lmSetBookmark($request, true);
     });
@@ -2968,137 +2963,144 @@ Route::group(['prefix' => 'api/v1/badges'], function () {
 });
 
 Route::group(['prefix' => 'api/v1/users'], function () {
-    Route::get('my/badges', function (Request $request) {
-        return Response::json([
-            'data' => lmMockUserBadges(lmMockCurrentUserId($request)),
-        ]);
-    });
+    Route::group(['middleware' => [JwtMiddleware::class]], function () {
+        Route::get('my/badges', function (Request $request) {
+            $userId = (int) $request->attributes->get('api_user')->id;
+            return Response::json(['data' => lmMockUserBadges($userId)]);
+        });
 
-    Route::get('my/pictures', function (Request $request) {
-        return Response::json([
-            'data' => lmUserPictures(lmMockCurrentUserId($request)),
-        ]);
-    });
+        Route::get('my/pictures', function (Request $request) {
+            $userId = (int) $request->attributes->get('api_user')->id;
+            return Response::json(['data' => lmUserPictures($userId)]);
+        });
 
-    Route::get('my/bookmarks', function (Request $request) {
-        return Response::json(lmUserBookmarks(lmMockCurrentUserId($request)));
-    });
+        Route::get('my/bookmarks', function (Request $request) {
+            $userId = (int) $request->attributes->get('api_user')->id;
+            return Response::json(lmUserBookmarks($userId));
+        });
 
-    Route::post('folders/create', function (Request $request) {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|between:2,255',
-        ]);
+        Route::post('folders/create', function (Request $request) {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|between:2,255',
+            ]);
 
-        if ($validator->fails()) {
-            return Response::json(['status' => 'KO', 'errors' => $validator->errors()], 422);
-        }
-
-        if (!lmEngagementTableExists('quivi_poi_bookmark_folders')) {
-            return Response::json(['error' => 'Bookmark folder storage is not available.'], 500);
-        }
-
-        $now = date('Y-m-d H:i:s');
-        $id = Db::table('quivi_poi_bookmark_folders')->insertGetId([
-            'user_id' => lmMockCurrentUserId($request),
-            'name' => $request->input('name'),
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        return Response::json(['status' => 'OK', 'id' => $id, 'name' => $request->input('name')], 201);
-    });
-
-    Route::match(['put', 'patch'], 'folders/{id}/update', function (Request $request, $id) {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|between:2,255',
-        ]);
-
-        if ($validator->fails()) {
-            return Response::json(['status' => 'KO', 'errors' => $validator->errors()], 422);
-        }
-
-        if (lmEngagementTableExists('quivi_poi_bookmark_folders')) {
-            $updated = Db::table('quivi_poi_bookmark_folders')
-                ->where('id', (int) $id)
-                ->where('user_id', lmMockCurrentUserId($request))
-                ->whereNull('deleted_at')
-                ->update([
-                    'name' => $request->input('name'),
-                    'updated_at' => date('Y-m-d H:i:s'),
-                ]);
-
-            if ($updated) {
-                return Response::json(['status' => 'OK', 'id' => (int) $id, 'name' => $request->input('name')]);
+            if ($validator->fails()) {
+                return Response::json(['status' => 'KO', 'errors' => $validator->errors()], 422);
             }
-        }
 
-        foreach (lmMockBookmarkFolderDefinitions() as $folder) {
-            if ((int) $folder['id'] === (int) $id) {
-                return Response::json(['status' => 'OK', 'id' => (int) $id, 'name' => $request->input('name')]);
+            if (!lmEngagementTableExists('quivi_poi_bookmark_folders')) {
+                return Response::json(['error' => 'Bookmark folder storage is not available.'], 500);
             }
-        }
 
-        return Response::json(['error' => 'Bookmark folder not found.'], 404);
-    });
+            $now = date('Y-m-d H:i:s');
+            $id = Db::table('quivi_poi_bookmark_folders')->insertGetId([
+                'user_id'    => (int) $request->attributes->get('api_user')->id,
+                'name'       => $request->input('name'),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
 
-    Route::delete('folders/{id}/delete', function (Request $request, $id) {
-        if (lmEngagementTableExists('quivi_poi_bookmark_folders')) {
-            $updated = Db::table('quivi_poi_bookmark_folders')
-                ->where('id', (int) $id)
-                ->where('user_id', lmMockCurrentUserId($request))
-                ->whereNull('deleted_at')
-                ->update([
-                    'deleted_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
-                ]);
+            return Response::json(['status' => 'OK', 'id' => $id, 'name' => $request->input('name')], 201);
+        });
 
-            if ($updated) {
-                if (lmEngagementTableExists('quivi_poi_bookmarks')) {
-                    Db::table('quivi_poi_bookmarks')
-                        ->where('folder_id', (int) $id)
-                        ->where('user_id', lmMockCurrentUserId($request))
-                        ->whereNull('deleted_at')
-                        ->update([
-                            'folder_id' => null,
-                            'updated_at' => date('Y-m-d H:i:s'),
-                        ]);
+        Route::match(['put', 'patch'], 'folders/{id}/update', function (Request $request, $id) {
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|between:2,255',
+            ]);
+
+            if ($validator->fails()) {
+                return Response::json(['status' => 'KO', 'errors' => $validator->errors()], 422);
+            }
+
+            $userId = (int) $request->attributes->get('api_user')->id;
+
+            if (lmEngagementTableExists('quivi_poi_bookmark_folders')) {
+                $updated = Db::table('quivi_poi_bookmark_folders')
+                    ->where('id', (int) $id)
+                    ->where('user_id', $userId)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'name'       => $request->input('name'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+
+                if ($updated) {
+                    return Response::json(['status' => 'OK', 'id' => (int) $id, 'name' => $request->input('name')]);
                 }
-
-                return Response::json(['success' => true, 'id' => (int) $id]);
             }
-        }
 
-        foreach (lmMockBookmarkFolderDefinitions() as $folder) {
-            if ((int) $folder['id'] === (int) $id) {
-                return Response::json(['success' => true, 'id' => (int) $id]);
+            foreach (lmMockBookmarkFolderDefinitions() as $folder) {
+                if ((int) $folder['id'] === (int) $id) {
+                    return Response::json(['status' => 'OK', 'id' => (int) $id, 'name' => $request->input('name')]);
+                }
             }
-        }
 
-        return Response::json(['error' => 'Bookmark folder not found.'], 404);
-    });
-
-    Route::get('folders/{id}', function (Request $request, $id) {
-        if (!lmBookmarkFolderExists(lmMockCurrentUserId($request), (int) $id)) {
             return Response::json(['error' => 'Bookmark folder not found.'], 404);
-        }
+        });
 
-        $bookmarks = lmUserBookmarks(lmMockCurrentUserId($request), (int) $id);
-        unset($bookmarks['folders']);
+        Route::delete('folders/{id}/delete', function (Request $request, $id) {
+            $userId = (int) $request->attributes->get('api_user')->id;
 
-        $folderName = 'Bookmark';
-        foreach (lmBookmarkFolders(lmMockCurrentUserId($request)) as $folder) {
-            if ((int) $folder['id'] === (int) $id) {
-                $folderName = $folder['name'];
-                break;
+            if (lmEngagementTableExists('quivi_poi_bookmark_folders')) {
+                $updated = Db::table('quivi_poi_bookmark_folders')
+                    ->where('id', (int) $id)
+                    ->where('user_id', $userId)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'deleted_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+
+                if ($updated) {
+                    if (lmEngagementTableExists('quivi_poi_bookmarks')) {
+                        Db::table('quivi_poi_bookmarks')
+                            ->where('folder_id', (int) $id)
+                            ->where('user_id', $userId)
+                            ->whereNull('deleted_at')
+                            ->update([
+                                'folder_id'  => null,
+                                'updated_at' => date('Y-m-d H:i:s'),
+                            ]);
+                    }
+
+                    return Response::json(['success' => true, 'id' => (int) $id]);
+                }
             }
-        }
 
-        return Response::json([
-            'id' => (int) $id,
-            'name' => $folderName,
-            'bookmarks' => $bookmarks,
-        ]);
-    })->where('id', '[0-9]+');
+            foreach (lmMockBookmarkFolderDefinitions() as $folder) {
+                if ((int) $folder['id'] === (int) $id) {
+                    return Response::json(['success' => true, 'id' => (int) $id]);
+                }
+            }
+
+            return Response::json(['error' => 'Bookmark folder not found.'], 404);
+        });
+
+        Route::get('folders/{id}', function (Request $request, $id) {
+            $userId = (int) $request->attributes->get('api_user')->id;
+
+            if (!lmBookmarkFolderExists($userId, (int) $id)) {
+                return Response::json(['error' => 'Bookmark folder not found.'], 404);
+            }
+
+            $bookmarks = lmUserBookmarks($userId, (int) $id);
+            unset($bookmarks['folders']);
+
+            $folderName = 'Bookmark';
+            foreach (lmBookmarkFolders($userId) as $folder) {
+                if ((int) $folder['id'] === (int) $id) {
+                    $folderName = $folder['name'];
+                    break;
+                }
+            }
+
+            return Response::json([
+                'id'        => (int) $id,
+                'name'      => $folderName,
+                'bookmarks' => $bookmarks,
+            ]);
+        })->where('id', '[0-9]+');
+    });
 
     Route::get('{id}/profile', function ($id) {
         return Response::json([

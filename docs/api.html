@@ -600,7 +600,7 @@ curl "http://localhost:8091/api/v1/pois/all" \
   "meta": { "total": 328, "page": 1, "per_page": 20, "last_page": 17, "has_more": true }
 }</code></pre>
 
-            <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/{id|slug}/bookmark</span></h3>
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/pois/{id|slug}/bookmark</span> <span class="badge auth">Auth</span></h3>
             <p>Salva un POI nei bookmark dell'utente corrente. Campo opzionale: <code>folder_id</code>. <code>DELETE</code> sullo stesso path rimuove il bookmark.</p>
         </section>
 
@@ -658,21 +658,21 @@ curl "http://localhost:8091/api/v1/pois/all" \
             <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/create</span></h3>
             <p>Crea e persiste una foto per un <code>poi_id</code>. Accetta JSON con <code>picture</code> URL, <code>system_file_id</code> restituito dall'upload, oppure multipart con file <code>picture</code>/<code>file</code>. Campi opzionali: <code>caption</code> massimo 500 caratteri, <code>exif_lat</code>, <code>exif_lng</code> oppure <code>exif_gps.lat</code>/<code>exif_gps.lng</code>. Se il multipart contiene coordinate EXIF reali, vengono usate come fallback quando le coordinate non sono passate dal client.</p>
 
-            <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/{id}/like</span></h3>
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/{id}/like</span> <span class="badge auth">Auth</span></h3>
             <p>Aggiunge un like alla foto per l'utente corrente. <code>DELETE</code> sullo stesso path rimuove il like. Risponde con <code>liked</code> e <code>likes_num</code>.</p>
 
-            <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/{id}/bookmark</span></h3>
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/pictures/{id}/bookmark</span> <span class="badge auth">Auth</span></h3>
             <p>Salva una foto nei bookmark dell'utente corrente. Campo opzionale: <code>folder_id</code>. <code>DELETE</code> sullo stesso path rimuove il bookmark.</p>
 
-            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/pictures/{id}/delete</span></h3>
-            <p>Elimina solo se lo user proprietario della foto coincide con l'utente corrente mock.</p>
+            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/pictures/{id}/delete</span> <span class="badge auth">Auth</span></h3>
+            <p>Elimina solo se lo user proprietario della foto coincide con l'utente corrente.</p>
         </section>
 
         <section>
             <h2>Comments &amp; Reviews</h2>
             <p>Commenti e recensioni condividono la stessa entità. Il campo <code>kind</code> discrimina il tipo: <code>comment</code> (default) o <code>review</code>. Le recensioni accettano un campo opzionale <code>rating</code> (intero 1–5). Ogni record contiene <code>id</code>, <code>kind</code>, <code>user</code>, <code>comment_text</code>, <code>rating</code>, <code>comment_date</code>, <code>likes_num</code>, <code>likes</code>, <code>comments_num</code> e <code>comments</code> per le risposte.</p>
 
-            <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/create</span></h3>
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/create</span> <span class="badge auth">Auth</span></h3>
             <p>Crea un commento o una recensione sul target indicato da <code>{id}</code> (<code>target_type</code>: <code>poi</code> o <code>picture</code>, default <code>poi</code>). Per le risposte passare <code>parent_id</code>. Il campo <code>rating</code> è accettato solo se <code>kind=review</code>.</p>
             <table>
                 <thead><tr><th>Campo body</th><th>Obbligo</th><th>Note</th></tr></thead>
@@ -694,14 +694,14 @@ curl "http://localhost:8091/api/v1/pois/all" \
   "users": [{ "id": 2, "username": "...", "avatar": "..." }]
 }</code></pre>
 
-            <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/like</span></h3>
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/like</span> <span class="badge auth">Auth</span></h3>
             <p>Aggiunge un like al commento per l'utente corrente. <code>DELETE</code> sullo stesso path rimuove il like. Risponde con <code>liked</code> e <code>likes_num</code>.</p>
 
-            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/comments/{id}/delete</span></h3>
-            <p>Elimina solo se <code>owner_user_id</code> coincide con l'utente corrente mock.</p>
+            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/comments/{id}/delete</span> <span class="badge auth">Auth</span></h3>
+            <p>Elimina solo se il commento appartiene all'utente autenticato.</p>
 
-            <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/comments/{id}/update</span></h3>
-            <p>Aggiorna <code>comment_text</code>; accetta anche <code>PUT</code>.</p>
+            <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/comments/{id}/update</span> <span class="badge auth">Auth</span></h3>
+            <p>Aggiorna <code>comment_text</code>; accetta anche <code>PUT</code>. Solo il proprietario del commento può modificarlo.</p>
 
             <h3><span class="method post">POST</span> <span class="path">/api/v1/comments/{id}/report</span> <span class="badge auth">Auth</span></h3>
             <p>Segnala un commento. Richiede <code>Authorization: Bearer &lt;token&gt;</code>. Incrementa <code>reports_count</code> sul commento; se raggiunge <code>3</code> imposta automaticamente <code>is_hidden: true</code>. Un utente può segnalare un commento una sola volta.</p>
@@ -757,28 +757,28 @@ const { logged } = await fetch('/api/v1/users/check', {
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/{id}/pictures</span></h3>
             <p>Foto caricate dall'utente.</p>
 
-            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/pictures</span></h3>
-            <p>Foto dell'utente corrente mock.</p>
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/pictures</span> <span class="badge auth">Auth</span></h3>
+            <p>Foto dell'utente autenticato.</p>
 
-            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/bookmarks</span></h3>
-            <p>Bookmark dell'utente corrente, divisi in POI, foto e cartelle.</p>
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/bookmarks</span> <span class="badge auth">Auth</span></h3>
+            <p>Bookmark dell'utente autenticato, divisi in POI, foto e cartelle.</p>
 
-            <h3><span class="method post">POST</span> <span class="path">/api/v1/bookmarks/create</span></h3>
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/bookmarks/create</span> <span class="badge auth">Auth</span></h3>
             <p>Crea un bookmark generico. Accetta <code>target_type</code> (<code>poi</code> o <code>picture</code>), <code>target_id</code> e <code>folder_id</code> opzionale. Per compatibilita accetta anche <code>poi_id</code> o <code>picture_id</code>. <code>DELETE /api/v1/bookmarks/delete</code> rimuove lo stesso target.</p>
 
-            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/badges</span></h3>
-            <p>Badge dell'utente corrente, inclusi quelli non ancora completati con <code>progress</code> e <code>target</code>.</p>
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/my/badges</span> <span class="badge auth">Auth</span></h3>
+            <p>Badge dell'utente autenticato, inclusi quelli non ancora completati con <code>progress</code> e <code>target</code>.</p>
 
-            <h3><span class="method post">POST</span> <span class="path">/api/v1/users/folders/create</span></h3>
+            <h3><span class="method post">POST</span> <span class="path">/api/v1/users/folders/create</span> <span class="badge auth">Auth</span></h3>
             <p>Crea una cartella bookmark. Campo richiesto: <code>name</code>.</p>
 
-            <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/users/folders/{id}/update</span></h3>
+            <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/users/folders/{id}/update</span> <span class="badge auth">Auth</span></h3>
             <p>Modifica il nome di una cartella bookmark; accetta anche <code>PUT</code>.</p>
 
-            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/users/folders/{id}/delete</span></h3>
-            <p>Elimina una cartella bookmark dell'utente corrente mock.</p>
+            <h3><span class="method delete">DELETE</span> <span class="path">/api/v1/users/folders/{id}/delete</span> <span class="badge auth">Auth</span></h3>
+            <p>Elimina una cartella bookmark dell'utente autenticato.</p>
 
-            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/folders/{id}</span></h3>
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/users/folders/{id}</span> <span class="badge auth">Auth</span></h3>
             <p>Restituisce tutti i bookmark contenuti nella cartella.</p>
         </section>
 
