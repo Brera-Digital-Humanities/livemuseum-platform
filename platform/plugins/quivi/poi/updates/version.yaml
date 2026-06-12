@@ -42,3 +42,6 @@
 1.0.15:
     - 'Add is_public flag to bookmark folders'
     - bookmark_folders_ispublic.php
+1.0.16:
+    - 'Add user rankings table (authority + photography)'
+    - user_rankings_schema.php

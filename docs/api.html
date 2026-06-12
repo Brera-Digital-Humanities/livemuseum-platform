@@ -371,9 +371,18 @@ curl -s http://localhost:8091/api/v1/users/check \
             <p>Tutte le rotte seguenti richiedono header <code>Authorization: Bearer &lt;token&gt;</code>.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/logged</span></h3>
-            <p>Restituisce il profilo dell'utente autenticato.</p>
+            <p>Restituisce il profilo dell'utente autenticato. Include l'oggetto <code>ranking</code>.</p>
             <pre><code>curl http://localhost:8091/api/v1/users/logged \
   -H "Authorization: Bearer TOKEN"</code></pre>
+            <pre><code>{
+  "id": 1,
+  "username": "mario",
+  ...
+  "ranking": {
+    "authority": 12,
+    "photography": 5
+  }
+}</code></pre>
 
             <h3><span class="method patch">PATCH</span> <span class="path">/api/v1/users/profile</span></h3>
             <p>Modifica i campi profilo. Accetta anche <code>PUT</code>.</p>
@@ -752,7 +761,17 @@ const { logged } = await fetch('/api/v1/users/check', {
         <section>
             <h2>Social Users</h2>
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/{id}/profile</span></h3>
-            <p>Profilo pubblico con follower, following, contatori commenti, foto, bookmark e badge.</p>
+            <p>Profilo pubblico con follower, following, contatori commenti, foto, bookmark, badge e <code>ranking</code>.</p>
+            <pre><code>{
+  "id": 5,
+  "username": "laura",
+  ...
+  "ranking": {
+    "authority": 8,
+    "photography": 21
+  }
+}</code></pre>
+            <p><code>authority</code> aumenta/diminuisce al like/unlike ricevuto sui propri commenti. <code>photography</code> aumenta/diminuisce al like/unlike ricevuto sulle proprie foto. I self-like non contano. Il valore minimo è 0.</p>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/users/{id}/pictures</span></h3>
             <p>Foto caricate dall'utente.</p>

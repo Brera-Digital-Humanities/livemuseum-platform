@@ -707,6 +707,63 @@ function lmPictureSystemFileColumnExists()
     return $exists;
 }
 
+// ---------------------------------------------------------------------------
+// User ranking helpers
+// ---------------------------------------------------------------------------
+
+function lmRankingTableExists(): bool
+{
+    static $exists = null;
+    if ($exists === null) {
+        $exists = Schema::hasTable('quivi_poi_user_rankings');
+    }
+    return $exists;
+}
+
+function lmUpdateUserRanking(int $userId, string $field, int $delta): void
+{
+    if (!$userId || !lmRankingTableExists()) {
+        return;
+    }
+
+    $allowed = ['authority', 'photography'];
+    if (!in_array($field, $allowed)) {
+        return;
+    }
+
+    $row = Db::table('quivi_poi_user_rankings')->where('user_id', $userId)->first();
+
+    if ($row) {
+        $newValue = max(0, (int) $row->$field + $delta);
+        Db::table('quivi_poi_user_rankings')
+            ->where('user_id', $userId)
+            ->update([$field => $newValue, 'updated_at' => date('Y-m-d H:i:s')]);
+    } else {
+        Db::table('quivi_poi_user_rankings')->insert([
+            'user_id'    => $userId,
+            'authority'  => $field === 'authority'   ? max(0, $delta) : 0,
+            'photography'=> $field === 'photography' ? max(0, $delta) : 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+}
+
+function lmUserRanking(int $userId): array
+{
+    if (!lmRankingTableExists()) {
+        return ['authority' => 0, 'photography' => 0];
+    }
+
+    $row = Db::table('quivi_poi_user_rankings')->where('user_id', $userId)->first();
+
+    return [
+        'authority'   => $row ? (int) $row->authority   : 0,
+        'photography' => $row ? (int) $row->photography : 0,
+    ];
+}
+
+// ---------------------------------------------------------------------------
+
 function lmEngagementTableExists($table)
 {
     static $exists = [];
@@ -1993,9 +2050,11 @@ function lmSetPictureLike(Request $request, $pictureId, $liked)
         return Response::json(['error' => 'Picture not found.'], 404);
     }
 
+    $likerId = (int) $request->attributes->get('api_user')->id;
+
     $where = [
         'picture_id' => $pictureId,
-        'user_id' => lmMockCurrentUserId($request),
+        'user_id'    => $likerId,
     ];
 
     if ($liked) {
@@ -2003,6 +2062,12 @@ function lmSetPictureLike(Request $request, $pictureId, $liked)
     } else {
         lmEngagementDeactivate('quivi_poi_picture_likes', $where);
         $result = ['created' => false];
+    }
+
+    // Update photography ranking for the picture owner
+    $picture = Db::table('quivi_poi_pictures')->select('user_id')->where('id', $pictureId)->first();
+    if ($picture && (int) $picture->user_id && (int) $picture->user_id !== $likerId) {
+        lmUpdateUserRanking((int) $picture->user_id, 'photography', $liked ? 1 : -1);
     }
 
     return Response::json(lmPictureLikePayload($pictureId, $liked), $liked && !empty($result['created']) ? 201 : 200);
@@ -2028,9 +2093,11 @@ function lmSetCommentLike(Request $request, $commentId, $liked)
         return Response::json(['error' => 'Comment not found.'], 404);
     }
 
+    $likerId = (int) $request->attributes->get('api_user')->id;
+
     $where = [
         'comment_id' => $commentId,
-        'user_id' => lmMockCurrentUserId($request),
+        'user_id'    => $likerId,
     ];
 
     if ($liked) {
@@ -2038,6 +2105,12 @@ function lmSetCommentLike(Request $request, $commentId, $liked)
     } else {
         lmEngagementDeactivate('quivi_poi_comment_likes', $where);
         $result = ['created' => false];
+    }
+
+    // Update authority ranking for the comment author
+    $comment = Db::table('quivi_poi_comments')->select('user_id')->where('id', $commentId)->first();
+    if ($comment && (int) $comment->user_id && (int) $comment->user_id !== $likerId) {
+        lmUpdateUserRanking((int) $comment->user_id, 'authority', $liked ? 1 : -1);
     }
 
     return Response::json(lmCommentLikePayload($commentId, $liked), $liked && !empty($result['created']) ? 201 : 200);
@@ -3170,18 +3243,19 @@ Route::group(['prefix' => 'api/v1/users'], function () {
 
     Route::get('{id}/profile', function ($id) {
         return Response::json([
-            'id' => (int) $id,
-            'username' => lmMockUser($id)['username'],
-            'avatar' => lmMockUser($id)['avatar'],
+            'id'            => (int) $id,
+            'username'      => lmMockUser($id)['username'],
+            'avatar'        => lmMockUser($id)['avatar'],
             'num_followers' => 128,
             'num_followeds' => 86,
-            'num_comments' => 34,
-            'num_pics' => 12,
+            'num_comments'  => 34,
+            'num_pics'      => 12,
             'num_bookmarks' => 19,
-            'num_badges' => count(lmMockUserBadges($id)),
-            'badges' => lmMockUserBadges($id),
-            'followers' => [lmMockUser(2), lmMockUser(3), lmMockUser(4)],
-            'followeds' => [lmMockUser(1), lmMockUser(3)],
+            'num_badges'    => count(lmMockUserBadges($id)),
+            'badges'        => lmMockUserBadges($id),
+            'followers'     => [lmMockUser(2), lmMockUser(3), lmMockUser(4)],
+            'followeds'     => [lmMockUser(1), lmMockUser(3)],
+            'ranking'       => lmUserRanking((int) $id),
         ]);
     });
 

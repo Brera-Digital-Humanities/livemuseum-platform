@@ -14,7 +14,8 @@ class UserResource
 
         $data = $user->toArray();
         $data['birth_date'] = $user->birth_date ? $user->birth_date->toDateString() : null;
-        $data['groups'] = array_values(array_unique($groups));
+        $data['groups']     = array_values(array_unique($groups));
+        $data['ranking']    = lmUserRanking((int) $user->id);
 
         unset(
             $data['password'],
