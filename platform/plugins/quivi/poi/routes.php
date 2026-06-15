@@ -1730,20 +1730,12 @@ function lmCategoriesForServices(array $services)
 
 function lmPoiQueryMeta($query)
 {
-    $types = (clone $query)
-        ->select('type')
-        ->whereNotNull('type')
-        ->where('type', '<>', '')
-        ->distinct()
-        ->orderBy('type')
-        ->pluck('type')
-        ->toArray();
-
     $categories = (clone $query)
         ->select('category_app')
         ->whereNotNull('category_app')
         ->where('category_app', '<>', '')
         ->distinct()
+        ->orderBy('category_app')
         ->pluck('category_app')
         ->toArray();
 
@@ -1756,8 +1748,8 @@ function lmPoiQueryMeta($query)
     ksort($services);
 
     return [
-        'types'    => array_values($types),
-        'services' => array_keys($services),
+        'categories' => array_values($categories),
+        'services'   => array_keys($services),
     ];
 }
 
@@ -2312,6 +2304,34 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
     Route::get('categories', function () {
         return Response::json(['data' => lmPoiCategories()]);
+    });
+
+    // GET /pois/highlights — daily rotating editorial picks
+    // Seed = YYYYMMDD → same selection all day, changes at midnight
+    Route::get('highlights', function (Request $request) {
+        $limit = min(50, max(1, (int) $request->input('limit', 10)));
+        $seed  = (int) date('Ymd');
+
+        $base = Db::table('quivi_poi_pois')
+            ->select(lmPoiSelectedColumns())
+            ->whereNull('deleted_at');
+
+        // Prefer livemuseum schede; fall back to all POIs if none exist
+        $lmCount = (clone $base)->where('scheda_type', 'livemuseum')->count();
+        if ($lmCount > 0) {
+            $base->where('scheda_type', 'livemuseum');
+        }
+
+        $rows = $base->orderByRaw("RAND($seed)")->limit($limit)->get();
+
+        return Response::json([
+            'data'  => $rows->map(fn($r) => lmPoiSummary($r))->values(),
+            'meta'  => [
+                'seed'          => $seed,
+                'scheda_type'   => $lmCount > 0 ? 'livemuseum' : 'all',
+                'total_pool'    => $lmCount > 0 ? $lmCount : (clone $base)->count(),
+            ],
+        ]);
     });
 
     Route::get('cluster', function (Request $request) {

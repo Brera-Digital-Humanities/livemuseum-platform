@@ -544,6 +544,24 @@ curl "http://localhost:8091/api/v1/pois/all" \
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/categories</span></h3>
             <p>Lista categorie: <code>id</code>, <code>name_en</code>, <code>name_it</code>.</p>
 
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/highlights</span></h3>
+            <p>Selezione editoriale giornaliera. Restituisce POI <code>scheda_type = livemuseum</code> in ordine casuale deterministico basato sulla data corrente (seed <code>YYYYMMDD</code>) — stessa selezione per tutta la giornata, rotazione automatica a mezzanotte. Se non esistono schede livemuseum, il fallback è sull'intero catalogo.</p>
+            <table>
+                <thead><tr><th>Parametro</th><th>Default</th><th>Note</th></tr></thead>
+                <tbody>
+                    <tr><td><code>limit</code></td><td>10</td><td>Max 50.</td></tr>
+                </tbody>
+            </table>
+            <pre><code>curl "{{baseUrl}}/api/v1/pois/highlights?limit=5"</code></pre>
+            <pre><code>{
+  "data": [ /* array di POI summary */ ],
+  "meta": {
+    "seed": 20260612,
+    "scheda_type": "livemuseum",
+    "total_pool": 42
+  }
+}</code></pre>
+
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/search?q=Amiternum</span></h3>
             <p>Ricerca testuale su titoli, tipologie, categorie, citta, province, regioni e indirizzi dei POI. Restituisce gli stessi oggetti reali della lista, con metadati di paginazione.</p>
             <table>
@@ -554,12 +572,12 @@ curl "http://localhost:8091/api/v1/pois/all" \
                     <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 500.</td></tr>
                     <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria (es. <code>Chiesa</code>). Combinabile con <code>q</code>.</td></tr>
                     <tr><td><code>schedaType</code></td><td>No</td><td><code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>.</td></tr>
-                    <tr><td><code>type</code></td><td>No</td><td>Filtra per tipologia esatta (es. <code>cappella</code>).</td></tr>
+                    <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria esatta (es. <code>cappella</code>). Corrisponde al campo <code>category_app</code> del database.</td></tr>
                     <tr><td><code>services</code></td><td>No</td><td>Servizio offerto, stringa o array. Valori: <code>Visite guidate</code>, <code>Bookshop</code>, <code>Accesso libero</code>, ecc.</td></tr>
                     <tr><td><code>location</code></td><td>No</td><td>Comune, provincia o regione (es. <code>Roma</code>, <code>Sicilia</code>).</td></tr>
                 </tbody>
             </table>
-            <p class="note">Senza parametri (nemmeno <code>q</code>) l'endpoint restituisce tutti i POI paginati. Il campo <code>meta.filters</code> contiene i valori <code>types</code> e <code>services</code> disponibili <em>nei risultati filtrati</em>, utili per popolare i filtri dinamicamente nel frontend.</p>
+            <p class="note">Senza parametri (nemmeno <code>q</code>) l'endpoint restituisce tutti i POI paginati. Il campo <code>meta.filters</code> contiene i valori <code>categories</code> e <code>services</code> disponibili <em>nei risultati filtrati</em>, utili per popolare i filtri dinamicamente nel frontend.</p>
             <pre><code>curl "http://localhost:8091/api/v1/pois/search?q=Amiternum&page=1&per_page=100" \
   -H "Accept: application/json"</code></pre>
             <pre><code>{
@@ -571,7 +589,7 @@ curl "http://localhost:8091/api/v1/pois/all" \
     "last_page": 1,
     "has_more": false,
     "filters": {
-      "types": ["cappella", "chiesa", "museo"],
+      "categories": ["cappella", "chiesa", "museo"],
       "services": ["Accesso libero", "Pannelli informativi", "Visite guidate"]
     }
   }

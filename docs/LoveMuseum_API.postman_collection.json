@@ -945,6 +945,38 @@
           "response": []
         },
         {
+          "name": "Get highlights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pois/highlights?limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pois",
+                "highlights"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Daily rotating editorial picks (scheda_type=livemuseum). Seed=YYYYMMDD → same selection all day, rotates at midnight. Falls back to all POIs if no livemuseum schede exist."
+          },
+          "response": []
+        },
+        {
           "name": "Search POIs",
           "event": [
             {
@@ -1033,7 +1065,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/pois/search?type=chiesa&location=Roma&page=1&per_page=10",
+              "raw": "{{baseUrl}}/api/v1/pois/search?category=chiesa&location=Roma&page=1&per_page=10",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1045,7 +1077,7 @@
               ],
               "query": [
                 {
-                  "key": "type",
+                  "key": "category",
                   "value": "chiesa"
                 },
                 {
