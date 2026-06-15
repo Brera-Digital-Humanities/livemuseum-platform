@@ -59,6 +59,18 @@ class Plugin extends PluginBase
                         'icon'        => 'icon-map-marker',
                         'permissions' => ['quivi.poi.pois'],
                     ],
+                    'itineraries' => [
+                        'label'       => 'Itinerari',
+                        'url'         => Backend::url('quivi/poi/itineraries'),
+                        'icon'        => 'icon-road',
+                        'permissions' => ['quivi.poi.itineraries'],
+                    ],
+                    'bookmarkfolders' => [
+                        'label'       => 'Collections',
+                        'url'         => Backend::url('quivi/poi/bookmarkfolders'),
+                        'icon'        => 'icon-folder',
+                        'permissions' => ['quivi.poi.bookmarkfolders'],
+                    ],
                     'pictures' => [
                         'label'       => 'Foto',
                         'url'         => Backend::url('quivi/poi/pictures'),
@@ -77,12 +89,6 @@ class Plugin extends PluginBase
                         'icon'        => 'icon-bookmark',
                         'permissions' => ['quivi.poi.bookmarks'],
                     ],
-                    'bookmarkfolders' => [
-                        'label'       => 'Collections',
-                        'url'         => Backend::url('quivi/poi/bookmarkfolders'),
-                        'icon'        => 'icon-folder',
-                        'permissions' => ['quivi.poi.bookmarkfolders'],
-                    ],
                     'commentlikes' => [
                         'label'       => 'Like commenti',
                         'url'         => Backend::url('quivi/poi/commentlikes'),
@@ -94,12 +100,6 @@ class Plugin extends PluginBase
                         'url'         => Backend::url('quivi/poi/reports'),
                         'icon'        => 'icon-flag',
                         'permissions' => ['quivi.poi.reports'],
-                    ],
-                    'itineraries' => [
-                        'label'       => 'Itinerari',
-                        'url'         => Backend::url('quivi/poi/itineraries'),
-                        'icon'        => 'icon-road',
-                        'permissions' => ['quivi.poi.itineraries'],
                     ],
                 ],
             ],
