@@ -945,6 +945,32 @@
           "response": []
         },
         {
+          "name": "Get services",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pois/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pois",
+                "services"
+              ]
+            },
+            "description": "Full static list of available service names, usable as filter values in /pois/search and /pois/list."
+          },
+          "response": []
+        },
+        {
           "name": "Get highlights",
           "request": {
             "method": "GET",

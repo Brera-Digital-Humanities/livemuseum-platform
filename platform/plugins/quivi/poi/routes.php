@@ -2309,6 +2309,16 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         return Response::json(['data' => lmPoiCategories()]);
     });
 
+    Route::get('services', function () {
+        $services = [
+            'Accesso eventi', 'Accesso libero', 'Area verde', 'Biglietteria',
+            'Bookshop', 'Consultazione cataloghi', 'Consultazione documenti',
+            'Guardaroba', 'Informazioni in loco', 'Pannelli informativi',
+            'Percorso visita', 'Sala lettura', 'Sala studio', 'Visite guidate',
+        ];
+        return Response::json(['data' => $services]);
+    });
+
     // GET /pois/highlights — daily rotating editorial picks
     // Seed = YYYYMMDD → same selection all day, changes at midnight
     Route::get('highlights', function (Request $request) {

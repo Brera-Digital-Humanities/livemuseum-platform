@@ -546,6 +546,13 @@ curl "http://localhost:8091/api/v1/pois/all" \
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/categories</span></h3>
             <p>Lista categorie: <code>id</code>, <code>name_en</code>, <code>name_it</code>.</p>
 
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/services</span></h3>
+            <p>Lista completa dei servizi disponibili. Valori statici usati come filtro in <code>/pois/search</code> e <code>/pois/list</code>.</p>
+            <pre><code>curl "{{baseUrl}}/api/v1/pois/services"</code></pre>
+            <pre><code>{
+  "data": ["Accesso eventi", "Accesso libero", "Area verde", "Biglietteria", "Bookshop", "..."]
+}</code></pre>
+
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/highlights</span></h3>
             <p>Selezione editoriale giornaliera. Restituisce POI <code>scheda_type = livemuseum</code> in ordine casuale deterministico basato sulla data corrente (seed <code>YYYYMMDD</code>) — stessa selezione per tutta la giornata, rotazione automatica a mezzanotte. Se non esistono schede livemuseum, il fallback è sull'intero catalogo.</p>
             <table>
