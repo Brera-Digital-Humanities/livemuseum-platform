@@ -447,7 +447,9 @@ curl -s http://localhost:8091/api/v1/users/check \
                     <tr><td><code>schedaType</code></td><td>No</td><td>Filtra per tipo scheda: <code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>.</td></tr>
                     <tr><td><code>type</code></td><td>No</td><td>Filtra per tipologia esatta (es. <code>cappella</code>, <code>chiesa</code>).</td></tr>
                     <tr><td><code>services</code></td><td>No</td><td>Filtra per servizio offerto. Stringa singola o array (es. <code>services[]=Visite+guidate</code>). Valori: <code>Bookshop</code>, <code>Visite guidate</code>, <code>Accesso libero</code>, ecc.</td></tr>
-                    <tr><td><code>location</code></td><td>No</td><td>Filtra per comune, provincia o regione (es. <code>Milano</code>, <code>Lombardia</code>).</td></tr>
+                    <tr><td><code>city</code></td><td>No</td><td>Filtra per comune esatto (es. <code>Milano</code>).</td></tr>
+                    <tr><td><code>province</code></td><td>No</td><td>Filtra per provincia esatta (es. <code>MI</code>).</td></tr>
+                    <tr><td><code>region</code></td><td>No</td><td>Filtra per regione esatta (es. <code>Lombardia</code>).</td></tr>
                 </tbody>
             </table>
 
@@ -458,7 +460,7 @@ curl -s http://localhost:8091/api/v1/users/check \
                 <tbody>
                     <tr><td><code>bbox</code></td><td>Si</td><td>Viewport: <code>south,west,north,east</code>.</td></tr>
                     <tr><td><code>zoom</code></td><td>Si</td><td>Livello zoom mappa (1–20). Determina la dimensione della cella di clustering.</td></tr>
-                    <tr><td><code>type</code>, <code>services</code>, <code>location</code>, <code>category</code></td><td>No</td><td>Stessi filtri di <code>pois/list</code>.</td></tr>
+                    <tr><td><code>category</code>, <code>services</code>, <code>city</code>, <code>province</code>, <code>region</code></td><td>No</td><td>Stessi filtri di <code>pois/list</code>.</td></tr>
                 </tbody>
             </table>
             <pre><code>curl "http://localhost:8091/api/v1/pois/cluster?bbox=41.85,12.4,42.0,12.6&zoom=10"</code></pre>
@@ -574,7 +576,9 @@ curl "http://localhost:8091/api/v1/pois/all" \
                     <tr><td><code>schedaType</code></td><td>No</td><td><code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>.</td></tr>
                     <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria esatta (es. <code>cappella</code>). Corrisponde al campo <code>category_app</code> del database.</td></tr>
                     <tr><td><code>services</code></td><td>No</td><td>Servizio offerto, stringa o array. Valori: <code>Visite guidate</code>, <code>Bookshop</code>, <code>Accesso libero</code>, ecc.</td></tr>
-                    <tr><td><code>location</code></td><td>No</td><td>Comune, provincia o regione (es. <code>Roma</code>, <code>Sicilia</code>).</td></tr>
+                    <tr><td><code>city</code></td><td>No</td><td>Filtra per comune esatto (es. <code>Roma</code>).</td></tr>
+                    <tr><td><code>province</code></td><td>No</td><td>Filtra per provincia esatta.</td></tr>
+                    <tr><td><code>region</code></td><td>No</td><td>Filtra per regione esatta (es. <code>Sicilia</code>).</td></tr>
                 </tbody>
             </table>
             <p class="note">Senza parametri (nemmeno <code>q</code>) l'endpoint restituisce tutti i POI paginati. Il campo <code>meta.filters</code> contiene i valori <code>categories</code> e <code>services</code> disponibili <em>nei risultati filtrati</em>, utili per popolare i filtri dinamicamente nel frontend.</p>

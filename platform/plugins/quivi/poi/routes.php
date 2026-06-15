@@ -1779,13 +1779,14 @@ function lmApplyPoiFilters($query, Request $request)
         }
     }
 
-    if ($request->filled('location')) {
-        $location = $request->input('location');
-        $query->where(function ($q) use ($location) {
-            $q->where('city', $location)
-              ->orWhere('province', $location)
-              ->orWhere('region', $location);
-        });
+    if ($request->filled('city')) {
+        $query->where('city', $request->input('city'));
+    }
+    if ($request->filled('province')) {
+        $query->where('province', $request->input('province'));
+    }
+    if ($request->filled('region')) {
+        $query->where('region', $request->input('region'));
     }
 
     return $query;
@@ -2200,7 +2201,7 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
 
             ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
 
-            $filterParams = $request->only(['category', 'schedaType', 'scheda_type', 'type', 'services', 'location']);
+            $filterParams = $request->only(['category', 'schedaType', 'scheda_type', 'type', 'services', 'city', 'province', 'region']);
             $countCacheKey = 'lm_poi_all_count_' . md5(serialize($filterParams));
             $total = (int) Cache::remember($countCacheKey, 120, function () use ($request) {
                 return (int) lmApplyPoiFilters(lmPoiBaseQuery(false), $request)->count();
@@ -2268,7 +2269,9 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             'scheda_type'=> 'nullable|string|in:base,unlockable,livemuseum,community',
             'type'       => 'nullable|string',
             'services'   => 'nullable',
-            'location'   => 'nullable|string',
+            'city'       => 'nullable|string',
+            'province'   => 'nullable|string',
+            'region'     => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -2442,7 +2445,9 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
             'scheda_type'=> 'nullable|string|in:base,unlockable,livemuseum,community',
             'type'       => 'nullable|string',
             'services'   => 'nullable',
-            'location'   => 'nullable|string',
+            'city'       => 'nullable|string',
+            'province'   => 'nullable|string',
+            'region'     => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
