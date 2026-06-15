@@ -18,4 +18,9 @@ class CommentLikes extends Controller
         parent::__construct();
         BackendMenu::setContext('Quivi.Poi', 'poi', 'commentlikes');
     }
+
+    public function update($recordId = null)
+    {
+        $this->asExtension('FormController')->update($recordId);
+    }
 }

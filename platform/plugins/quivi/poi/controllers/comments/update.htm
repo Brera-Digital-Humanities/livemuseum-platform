@@ -1,1 +1,52 @@
-<?= $this->formRender() ?>
+<?php Block::put('breadcrumb') ?>
+    <ul>
+        <li><a href="<?= Backend::url('quivi/poi/comments') ?>">Commenti</a></li>
+        <li><?= e($this->pageTitle) ?></li>
+    </ul>
+<?php Block::endPut() ?>
+
+<?php if (!$this->fatalError): ?>
+
+    <?php Block::put('body') ?>
+        <?= Form::open(['class' => 'layout']) ?>
+            <div class="layout-row">
+                <?= $this->formRenderOutsideFields() ?>
+            </div>
+            <div class="form-buttons">
+                <div class="loading-indicator-container">
+                    <button
+                        type="submit"
+                        data-request="onSave"
+                        data-request-data="redirect:0"
+                        data-hotkey="ctrl+s, cmd+s"
+                        data-load-indicator="Salvataggio..."
+                        class="btn btn-primary">
+                        Salva
+                    </button>
+                    <button
+                        type="button"
+                        data-request="onSave"
+                        data-request-data="close:1"
+                        data-hotkey="ctrl+enter, cmd+enter"
+                        data-load-indicator="Salvataggio..."
+                        class="btn btn-default">
+                        Salva e chiudi
+                    </button>
+                    <span class="btn-text">
+                        oppure <a href="<?= Backend::url('quivi/poi/comments') ?>">Annulla</a>
+                    </span>
+                    <button
+                        class="oc-icon-trash-o btn-icon danger pull-right"
+                        data-request="onDelete"
+                        data-load-indicator="Eliminazione..."
+                        data-request-confirm="Eliminare questo commento?">
+                    </button>
+                </div>
+            </div>
+        <?= Form::close() ?>
+    <?php Block::endPut() ?>
+
+<?php else: ?>
+    <p class="flash-message static error"><?= e($this->fatalError) ?></p>
+    <p><a href="<?= Backend::url('quivi/poi/comments') ?>" class="btn btn-default">Torna alla lista</a></p>
+<?php endif ?>

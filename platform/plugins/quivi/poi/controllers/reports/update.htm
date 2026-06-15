@@ -1,5 +1,28 @@
-<?php if (!empty($fatalError)): ?>
-    <p class="flash-message static error"><?= e($fatalError) ?></p>
+<?php Block::put('breadcrumb') ?>
+    <ul>
+        <li><a href="<?= Backend::url('quivi/poi/reports') ?>">Segnalazioni</a></li>
+        <li><?= e($this->pageTitle) ?></li>
+    </ul>
+<?php Block::endPut() ?>
+
+<?php if (!$this->fatalError): ?>
+
+    <?php Block::put('body') ?>
+        <?= Form::open(['class' => 'layout']) ?>
+            <div class="layout-row">
+                <?= $this->formRenderOutsideFields() ?>
+            </div>
+            <div class="form-buttons">
+                <div class="loading-indicator-container">
+                    <span class="btn-text">
+                        <a href="<?= Backend::url('quivi/poi/reports') ?>">Torna alla lista</a>
+                    </span>
+                </div>
+            </div>
+        <?= Form::close() ?>
+    <?php Block::endPut() ?>
+
 <?php else: ?>
-    <?= $this->formRender() ?>
+    <p class="flash-message static error"><?= e($this->fatalError) ?></p>
+    <p><a href="<?= Backend::url('quivi/poi/reports') ?>" class="btn btn-default">Torna alla lista</a></p>
 <?php endif ?>
