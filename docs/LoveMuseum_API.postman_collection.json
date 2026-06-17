@@ -1062,7 +1062,7 @@
                 }
               ]
             },
-            "description": "Full-text search on title, category, city, province, region. Minimum 3 chars when q is present (422 if shorter). Results ordered by relevance when q is set, by title otherwise. meta.filters (categories + services) is only returned when q is absent."
+            "description": "Full-text search on title, category, city, province, region.\n- q < 2 chars → 422\n- q = 2 chars → LIKE prefix on title only, ordered by title\n- q ≥ 3 chars → FULLTEXT index, ordered by relevance\nmeta.filters (categories + services) only returned when q is absent."
           },
           "response": []
         },
@@ -1135,7 +1135,7 @@
                 }
               ]
             },
-            "description": "Full-text search on title, category, city, province, region. Minimum 3 chars when q is present (422 if shorter). Results ordered by relevance when q is set, by title otherwise. meta.filters (categories + services) is only returned when q is absent."
+            "description": "Full-text search on title, category, city, province, region.\n- q < 2 chars → 422\n- q = 2 chars → LIKE prefix on title only, ordered by title\n- q ≥ 3 chars → FULLTEXT index, ordered by relevance\nmeta.filters (categories + services) only returned when q is absent."
           },
           "response": []
         },

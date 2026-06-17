@@ -1875,18 +1875,22 @@ function lmMockPoi($identifier)
 function lmSearchPoisQuery($query, Request $request = null)
 {
     $term = trim((string) $query);
-    $safe = str_replace(['\'', '"', '*', '+', '-', '~', '<', '>', '(', ')', '@'], ' ', $term);
-    $boolean = implode(' ', array_map(fn($w) => $w . '*', array_filter(explode(' ', $safe))));
+    $q    = lmPoiBaseQuery(false);
 
-    $q = lmPoiBaseQuery(false)
-        ->whereRaw(
+    if (strlen($term) >= 3) {
+        $safe    = str_replace(['\'', '"', '*', '+', '-', '~', '<', '>', '(', ')', '@'], ' ', $term);
+        $boolean = implode(' ', array_map(fn($w) => $w . '*', array_filter(explode(' ', $safe))));
+        $q->whereRaw(
             'MATCH(title, city, province, region, category_app, fulladdress) AGAINST(? IN BOOLEAN MODE)',
             [$boolean]
-        )
-        ->orderByRaw(
+        )->orderByRaw(
             'MATCH(title, city, province, region, category_app, fulladdress) AGAINST(? IN BOOLEAN MODE) DESC',
             [$boolean]
         );
+    } else {
+        $like = str_replace(['%', '_'], ['\%', '\_'], $term) . '%';
+        $q->where('title', 'like', $like)->orderBy('title');
+    }
 
     if ($request) {
         lmApplyPoiFilters($q, $request);
@@ -2468,8 +2472,8 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         $q = trim((string) $request->input('q', ''));
         ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
 
-        if ($q !== '' && strlen($q) < 3) {
-            return Response::json(['error' => 'Query too short. Minimum 3 characters.'], 422);
+        if ($q !== '' && strlen($q) < 2) {
+            return Response::json(['error' => 'Query too short. Minimum 2 characters.'], 422);
         }
 
         if ($q !== '') {

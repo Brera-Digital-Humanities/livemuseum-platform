@@ -576,7 +576,7 @@ curl "http://localhost:8091/api/v1/pois/all" \
             <table>
                 <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
                 <tbody>
-                    <tr><td><code>q</code></td><td>No</td><td>Testo da cercare. Minimo 3 caratteri (422 se più corto). Usa FULLTEXT index — ricerche specifiche &lt; 10ms.</td></tr>
+                    <tr><td><code>q</code></td><td>No</td><td>Testo da cercare. Minimo 2 caratteri (422 se più corto). Con 2 caratteri usa LIKE prefix su <code>title</code>; con 3+ usa FULLTEXT su tutti i campi ordinato per rilevanza.</td></tr>
                     <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
                     <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 500.</td></tr>
                     <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria esatta (es. <code>Chiesa</code>, <code>Museo</code>). Combinabile con <code>q</code>.</td></tr>
