@@ -28,6 +28,9 @@ class Poi extends Model
     public $hasMany = [
         'comments' => [\Quivi\Poi\Models\Comment::class, 'key' => 'target_id', 'conditions' => "target_type = 'poi'"],
     ];
+    public $attachOne = [
+        'image' => ['System\Models\File', 'delete' => true],
+    ];
 
     public function getSchedaTypeOptions()
     {
