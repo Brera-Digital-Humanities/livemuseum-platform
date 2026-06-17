@@ -1874,18 +1874,19 @@ function lmMockPoi($identifier)
 
 function lmSearchPoisQuery($query, Request $request = null)
 {
-    $like = '%' . str_replace(['%', '_'], ['\%', '\_'], trim((string) $query)) . '%';
+    $term = trim((string) $query);
+    $safe = str_replace(['\'', '"', '*', '+', '-', '~', '<', '>', '(', ')', '@'], ' ', $term);
+    $boolean = implode(' ', array_map(fn($w) => $w . '*', array_filter(explode(' ', $safe))));
 
     $q = lmPoiBaseQuery(false)
-        ->where(function ($sub) use ($like) {
-            $sub->where('title', 'like', $like)
-                ->orWhere('type', 'like', $like)
-                ->orWhere('category_app', 'like', $like)
-                ->orWhere('city', 'like', $like)
-                ->orWhere('province', 'like', $like)
-                ->orWhere('region', 'like', $like)
-                ->orWhere('fulladdress', 'like', $like);
-        });
+        ->whereRaw(
+            'MATCH(title, city, province, region, category_app, fulladdress) AGAINST(? IN BOOLEAN MODE)',
+            [$boolean]
+        )
+        ->orderByRaw(
+            'MATCH(title, city, province, region, category_app, fulladdress) AGAINST(? IN BOOLEAN MODE) DESC',
+            [$boolean]
+        );
 
     if ($request) {
         lmApplyPoiFilters($q, $request);
@@ -2467,28 +2468,42 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         $q = trim((string) $request->input('q', ''));
         ['page' => $page, 'perPage' => $perPage, 'offset' => $offset] = lmPageParams($request, 100, 500);
 
-        $baseQuery = $q !== ''
-            ? fn() => lmSearchPoisQuery($q, $request)
-            : fn() => lmApplyPoiFilters(lmPoiBaseQuery(false), $request);
+        if ($q !== '' && strlen($q) < 3) {
+            return Response::json(['error' => 'Query too short. Minimum 3 characters.'], 422);
+        }
 
-        $total       = (int) $baseQuery()->count();
-        $filtersMeta = lmPoiQueryMeta($baseQuery());
-        $items       = lmPoiResponses(
-            $baseQuery()->orderBy('title')->limit($perPage)->offset($offset)->get(),
-            ['related' => 'full']
-        );
-
-        return Response::json([
-            'data' => $items,
-            'meta' => [
+        if ($q !== '') {
+            $baseQuery = fn() => lmSearchPoisQuery($q, $request);
+            $total = (int) $baseQuery()->count();
+            $items = lmPoiResponses(
+                $baseQuery()->limit($perPage)->offset($offset)->get(),
+                ['related' => 'full']
+            );
+            $meta = [
                 'total'     => $total,
                 'page'      => $page,
                 'per_page'  => $perPage,
                 'last_page' => max(1, (int) ceil($total / $perPage)),
                 'has_more'  => ($offset + count($items)) < $total,
-                'filters'   => $filtersMeta,
-            ],
-        ]);
+            ];
+        } else {
+            $baseQuery = fn() => lmApplyPoiFilters(lmPoiBaseQuery(false), $request);
+            $total = (int) $baseQuery()->count();
+            $items = lmPoiResponses(
+                $baseQuery()->orderBy('title')->limit($perPage)->offset($offset)->get(),
+                ['related' => 'full']
+            );
+            $meta = [
+                'total'     => $total,
+                'page'      => $page,
+                'per_page'  => $perPage,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'has_more'  => ($offset + count($items)) < $total,
+                'filters'   => lmPoiQueryMeta($baseQuery()),
+            ];
+        }
+
+        return Response::json(['data' => $items, 'meta' => $meta]);
     });
 
     Route::post('create', function (Request $request) {

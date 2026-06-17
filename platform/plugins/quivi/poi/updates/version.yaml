@@ -45,3 +45,9 @@
 1.0.16:
     - 'Add user rankings table (authority + photography)'
     - user_rankings_schema.php
+1.0.17:
+    - 'Add FULLTEXT index on POI search columns'
+    - poi_fulltext_search_index.php
+1.0.18:
+    - 'Add composite index on (deleted_at, title) for sorted listing'
+    - poi_title_index.php
