@@ -572,23 +572,22 @@ curl "http://localhost:8091/api/v1/pois/all" \
 }</code></pre>
 
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/search?q=Amiternum</span></h3>
-            <p>Ricerca testuale su titoli, tipologie, categorie, citta, province, regioni e indirizzi dei POI. Restituisce gli stessi oggetti reali della lista, con metadati di paginazione.</p>
+            <p>Ricerca testuale full-text su titolo, categoria, città, provincia, regione. Senza <code>q</code> funziona come endpoint di listing filtrato. Risultati ordinati per rilevanza quando <code>q</code> è presente, per titolo altrimenti.</p>
             <table>
                 <thead><tr><th>Parametro query</th><th>Obbligo</th><th>Note</th></tr></thead>
                 <tbody>
-                    <tr><td><code>q</code></td><td>Si</td><td>Testo da cercare.</td></tr>
+                    <tr><td><code>q</code></td><td>No</td><td>Testo da cercare. Minimo 3 caratteri (422 se più corto). Usa FULLTEXT index — ricerche specifiche &lt; 10ms.</td></tr>
                     <tr><td><code>page</code></td><td>No</td><td>Numero di pagina (default 1).</td></tr>
                     <tr><td><code>per_page</code> / <code>limit</code></td><td>No</td><td>Elementi per pagina. Default 100, max 500.</td></tr>
-                    <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria (es. <code>Chiesa</code>). Combinabile con <code>q</code>.</td></tr>
+                    <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria esatta (es. <code>Chiesa</code>, <code>Museo</code>). Combinabile con <code>q</code>.</td></tr>
                     <tr><td><code>schedaType</code></td><td>No</td><td><code>base</code>, <code>unlockable</code>, <code>livemuseum</code>, <code>community</code>.</td></tr>
-                    <tr><td><code>category</code></td><td>No</td><td>Filtra per categoria esatta (es. <code>cappella</code>). Corrisponde al campo <code>category_app</code> del database.</td></tr>
-                    <tr><td><code>services</code></td><td>No</td><td>Servizio offerto, stringa o array. Valori: <code>Visite guidate</code>, <code>Bookshop</code>, <code>Accesso libero</code>, ecc.</td></tr>
+                    <tr><td><code>services</code></td><td>No</td><td>Servizio offerto, stringa o array. Valori da <code>/pois/services</code>.</td></tr>
                     <tr><td><code>city</code></td><td>No</td><td>Filtra per comune esatto (es. <code>Roma</code>).</td></tr>
                     <tr><td><code>province</code></td><td>No</td><td>Filtra per provincia esatta.</td></tr>
                     <tr><td><code>region</code></td><td>No</td><td>Filtra per regione esatta (es. <code>Sicilia</code>).</td></tr>
                 </tbody>
             </table>
-            <p class="note">Senza parametri (nemmeno <code>q</code>) l'endpoint restituisce tutti i POI paginati. Il campo <code>meta.filters</code> contiene i valori <code>categories</code> e <code>services</code> disponibili <em>nei risultati filtrati</em>, utili per popolare i filtri dinamicamente nel frontend.</p>
+            <p class="note"><code>meta.filters</code> (con <code>categories</code> e <code>services</code> disponibili nei risultati) è incluso solo nelle chiamate senza <code>q</code>, utile per popolare i filtri dinamicamente nel frontend.</p>
             <pre><code>curl "http://localhost:8091/api/v1/pois/search?q=Amiternum&page=1&per_page=100" \
   -H "Accept: application/json"</code></pre>
             <pre><code>{
@@ -598,7 +597,19 @@ curl "http://localhost:8091/api/v1/pois/all" \
     "page": 1,
     "per_page": 100,
     "last_page": 1,
-    "has_more": false,
+    "has_more": false
+  }
+}</code></pre>
+            <pre><code># Filter-only (no q) — include meta.filters
+curl "http://localhost:8091/api/v1/pois/search?region=Sicilia&per_page=5"</code></pre>
+            <pre><code>{
+  "data": [ "..." ],
+  "meta": {
+    "total": 8420,
+    "page": 1,
+    "per_page": 5,
+    "last_page": 1684,
+    "has_more": true,
     "filters": {
       "categories": ["cappella", "chiesa", "museo"],
       "services": ["Accesso libero", "Pannelli informativi", "Visite guidate"]
