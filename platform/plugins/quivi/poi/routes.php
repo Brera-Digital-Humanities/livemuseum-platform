@@ -2352,6 +2352,26 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         ]);
     });
 
+    Route::get('pins', function () {
+        $cursor = Db::table('quivi_poi_pois')
+            ->select('id', 'lat', 'lng')
+            ->whereNull('deleted_at')
+            ->whereNotNull('lat')
+            ->whereNotNull('lng')
+            ->cursor();
+
+        return Response::stream(function () use ($cursor) {
+            echo '[';
+            $first = true;
+            foreach ($cursor as $row) {
+                if (!$first) echo ',';
+                echo json_encode(['id' => (int) $row->id, 'lat' => (float) $row->lat, 'lng' => (float) $row->lng]);
+                $first = false;
+            }
+            echo ']';
+        }, 200, ['Content-Type' => 'application/json']);
+    });
+
     Route::get('cluster', function (Request $request) {
         $validator = Validator::make($request->all(), [
             'bbox' => 'required|string',

@@ -453,6 +453,12 @@ curl -s http://localhost:8091/api/v1/users/check \
                 </tbody>
             </table>
 
+            <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/pins</span></h3>
+            <p>Lista completa di tutti i POI con solo <code>id</code>, <code>lat</code>, <code>lng</code>. Pensato per il rendering client-side della mappa senza clustering. Risposta in streaming JSON (~7MB, ~156k punti). Nessun parametro.</p>
+            <pre><code>curl "{{baseUrl}}/api/v1/pois/pins"</code></pre>
+            <pre><code>[{"id":1,"lat":42.400776,"lng":13.305769},{"id":2,"lat":41.889111,"lng":13.473806},...]
+</code></pre>
+
             <h3><span class="method get">GET</span> <span class="path">/api/v1/pois/cluster?bbox=36,6.5,47.5,18.5&amp;zoom=7</span></h3>
             <p>Clustering server-side per mappa. Raggruppa i POI in una griglia la cui dimensione dipende dal livello di zoom. A zoom ≥ 15 restituisce POI singoli (cap 500). I cluster con <code>count=1</code> includono <code>id</code>, <code>slug</code>, <code>title</code>, <code>type</code> e <code>image_url</code> del POI. <code>meta.total_pois</code> indica quanti POI totali ricadono nel bbox prima del clustering.</p>
             <table>

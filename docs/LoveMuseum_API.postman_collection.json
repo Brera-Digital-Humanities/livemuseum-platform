@@ -1003,6 +1003,32 @@
           "response": []
         },
         {
+          "name": "Get all pins (map testing)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pois/pins",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pois",
+                "pins"
+              ]
+            },
+            "description": "Full list of all POIs with id, lat, lng only. For client-side map rendering without clustering. Streaming JSON array (~7MB, ~156k points). No parameters.\nResponse: [{\"id\":1,\"lat\":42.4,\"lng\":13.3},...]"
+          },
+          "response": []
+        },
+        {
           "name": "Search POIs",
           "event": [
             {
