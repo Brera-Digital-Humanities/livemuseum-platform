@@ -5,6 +5,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Quivi\Poi\Models\Poi as PoiModel;
 use System\Models\File as SystemFile;
 use Quivi\Profile\Classes\JwtMiddleware;
 
@@ -247,7 +248,23 @@ function lmPoiSelectedColumns($includeRaw = false)
         $columns[] = 'raw_data';
     }
 
-    return $columns;
+    return array_merge($columns, lmPoiImageAttachmentColumns());
+}
+
+function lmPoiImageAttachmentColumns()
+{
+    $attachmentType = str_replace(["\\", "'"], ["\\\\", "''"], (new PoiModel)->getMorphClass());
+    $attachmentWhere = "attachment_type = '" . $attachmentType . "'"
+        . " AND attachment_id = quivi_poi_pois.id"
+        . " AND field = 'image'";
+
+    return [
+        Db::raw("(SELECT id FROM system_files WHERE {$attachmentWhere} ORDER BY id DESC LIMIT 1) AS attached_image_id"),
+        Db::raw("(SELECT disk_name FROM system_files WHERE {$attachmentWhere} ORDER BY id DESC LIMIT 1) AS attached_image_disk_name"),
+        Db::raw("(SELECT file_name FROM system_files WHERE {$attachmentWhere} ORDER BY id DESC LIMIT 1) AS attached_image_file_name"),
+        Db::raw("(SELECT content_type FROM system_files WHERE {$attachmentWhere} ORDER BY id DESC LIMIT 1) AS attached_image_content_type"),
+        Db::raw("(SELECT is_public FROM system_files WHERE {$attachmentWhere} ORDER BY id DESC LIMIT 1) AS attached_image_is_public"),
+    ];
 }
 
 function lmPoiBaseQuery($includeRaw = false)
@@ -393,6 +410,11 @@ function lmPoiFullAddress($fulladdress, $address, $city, $province, $region)
 
 function lmPoiImageUrl($row)
 {
+    $attachedUrl = lmPoiAttachedImageUrl($row);
+    if ($attachedUrl) {
+        return $attachedUrl;
+    }
+
     $imageUrl = lmPoiText($row->image_url ?? null);
 
     if ($imageUrl) {
@@ -400,6 +422,27 @@ function lmPoiImageUrl($row)
     }
 
     return 'https://picsum.photos/seed/lm-poi-' . (int) $row->id . '/1200/900';
+}
+
+function lmPoiAttachedImageUrl($row)
+{
+    if (
+        !isset($row->attached_image_id, $row->attached_image_disk_name)
+        || empty($row->attached_image_id)
+        || empty($row->attached_image_disk_name)
+    ) {
+        return null;
+    }
+
+    $file = (new SystemFile)->newFromBuilder([
+        'id' => (int) $row->attached_image_id,
+        'disk_name' => $row->attached_image_disk_name,
+        'file_name' => ($row->attached_image_file_name ?? null) ?: $row->attached_image_disk_name,
+        'content_type' => ($row->attached_image_content_type ?? null) ?: 'image/jpeg',
+        'is_public' => isset($row->attached_image_is_public) ? (bool) $row->attached_image_is_public : true,
+    ]);
+
+    return lmPictureSystemFileUrl($file);
 }
 
 function lmPoiServices($categoryName)
@@ -2404,9 +2447,9 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
                     'slug'      => $row->slug,
                     'title'     => $row->title,
                     'type'      => $row->type,
-                    'image_url' => $row->image_url,
+                    'image_url' => lmPoiImageUrl($row),
                 ];
-            }, $baseQuery->orderBy('id')->limit(500)->get()->all());
+            }, $rows->all());
 
             return Response::json([
                 'data' => $items,
@@ -2433,7 +2476,7 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
         $repPois  = [];
         if ($repIds) {
             $repPois = Db::table('quivi_poi_pois')
-                ->select(['id', 'slug', 'title', 'type', 'image_url'])
+                ->select(lmPoiSelectedColumns())
                 ->whereIn('id', $repIds)
                 ->get()
                 ->keyBy('id');
@@ -2457,7 +2500,7 @@ Route::group(['prefix' => 'api/v1/pois'], function () {
                 $item['slug']      = $poi->slug;
                 $item['title']     = $poi->title;
                 $item['type']      = $poi->type;
-                $item['image_url'] = $poi->image_url;
+                $item['image_url'] = lmPoiImageUrl($poi);
             }
 
             return $item;

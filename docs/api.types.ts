@@ -61,6 +61,7 @@ export interface PoiSummary {
   province: string | null
   lat: number | null
   lng: number | null
+  // Public URL of the synced POI attachment when available, otherwise source image URL/fallback.
   image_url: string | null
   num_pictures: number
   num_likes: number
@@ -89,6 +90,7 @@ export interface Poi {
   distance: number | null   // metres, present on /pois/nearby
   category: PoiCategory
   descr: string
+  // Public URL of the synced POI attachment when available, otherwise source image URL/fallback.
   image_url: string | null
   phone: string | null
   email: string | null
