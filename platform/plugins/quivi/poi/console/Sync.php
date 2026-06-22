@@ -91,6 +91,10 @@ class Sync extends Command
         ));
     }
 
+    protected function sync_imageurls(){
+        
+    }
+
 
     protected function sync_none(){}
 
