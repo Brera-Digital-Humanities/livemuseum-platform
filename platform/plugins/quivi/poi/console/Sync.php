@@ -7,6 +7,9 @@ use Symfony\Component\Console\Input\InputArgument;
 use Carbon\Carbon;
 use Db;
 use Illuminate\Support\Str;
+use Quivi\Poi\Models\Poi;
+use System\Models\File as SystemFile;
+use Throwable;
 
 class Sync extends Command
 {
@@ -92,7 +95,107 @@ class Sync extends Command
     }
 
     protected function sync_imageurls(){
-        
+        $limit = (int) $this->option('limit');
+        $stats = [
+            'processed' => 0,
+            'downloaded' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'already_attached' => 0,
+        ];
+
+        $attachmentType = (new Poi)->getMorphClass();
+
+        $query = Db::table('quivi_poi_pois as poi')
+            ->leftJoin('system_files as image', function ($join) use ($attachmentType) {
+                $join->on('image.attachment_id', '=', 'poi.id')
+                    ->where('image.attachment_type', '=', $attachmentType)
+                    ->where('image.field', '=', 'image');
+            })
+            ->select('poi.id', 'poi.title', 'poi.image_url')
+            ->whereNull('poi.deleted_at')
+            ->whereNotNull('poi.image_url')
+            ->where('poi.image_url', '<>', '')
+            ->whereNull('image.id')
+            ->orderBy('poi.id');
+
+        $this->output->writeln('Syncing POI images from image_url');
+
+        $lastId = 0;
+        while (true) {
+            $rows = (clone $query)
+                ->where('poi.id', '>', $lastId)
+                ->limit(100)
+                ->get();
+
+            if ($rows->isEmpty()) {
+                break;
+            }
+
+            foreach ($rows as $row) {
+                if ($limit > 0 && $stats['processed'] >= $limit) {
+                    break 2;
+                }
+
+                $lastId = (int) $row->id;
+                $stats['processed']++;
+
+                $poi = Poi::find((int) $row->id);
+                if (!$poi) {
+                    $stats['skipped']++;
+                    continue;
+                }
+
+                if ($poi->image) {
+                    $stats['already_attached']++;
+                    continue;
+                }
+
+                $url = $this->cleanImageSourceUrl($row->image_url);
+                if (!$this->isDownloadableImageUrl($url)) {
+                    $stats['skipped']++;
+                    $this->writeImageSyncSkip($row->id, 'invalid URL');
+                    continue;
+                }
+
+                try {
+                    $result = $this->downloadAndAttachPoiImage($poi, $url);
+                } catch (Throwable $e) {
+                    $stats['failed']++;
+                    $this->writeImageSyncSkip($row->id, $e->getMessage());
+                    continue;
+                }
+
+                if ($result['ok']) {
+                    $stats['downloaded']++;
+                    if ($this->isImageSyncVerbose()) {
+                        $this->output->writeln(sprintf('  downloaded #%d %s', $row->id, $result['path']));
+                    }
+                } else {
+                    $stats['skipped']++;
+                    $this->writeImageSyncSkip($row->id, $result['reason']);
+                }
+
+                if ($stats['processed'] % 100 === 0) {
+                    $this->output->writeln(sprintf(
+                        '  processed=%d downloaded=%d skipped=%d failed=%d',
+                        $stats['processed'],
+                        $stats['downloaded'],
+                        $stats['skipped'],
+                        $stats['failed']
+                    ));
+                }
+            }
+        }
+
+        $this->output->writeln(sprintf(
+            'POI image sync completed. processed=%d downloaded=%d skipped=%d failed=%d already_attached=%d',
+            $stats['processed'],
+            $stats['downloaded'],
+            $stats['skipped'],
+            $stats['failed'],
+            $stats['already_attached']
+        ));
     }
 
 
@@ -608,6 +711,322 @@ class Sync extends Command
         }
 
         return null;
+    }
+
+    protected function cleanImageSourceUrl($url)
+    {
+        $url = $this->cleanString($url);
+        if (!$url) {
+            return null;
+        }
+
+        if (strpos($url, '//') === 0) {
+            return 'https:' . $url;
+        }
+
+        return $url;
+    }
+
+    protected function isDownloadableImageUrl($url)
+    {
+        if (!$url) {
+            return false;
+        }
+
+        $parts = parse_url($url);
+        $scheme = strtolower($parts['scheme'] ?? '');
+
+        return in_array($scheme, ['http', 'https'], true) && !empty($parts['host']);
+    }
+
+    protected function downloadAndAttachPoiImage(Poi $poi, $url)
+    {
+        $download = $this->downloadImageUrl($url);
+        if (!$download['ok']) {
+            return $download;
+        }
+
+        $tempPath = $download['path'];
+
+        try {
+            $image = $this->downloadedImageInfo($tempPath, $download['content_type']);
+            if (!$image['ok']) {
+                return $image;
+            }
+
+            $filename = $this->poiImageFilename(
+                $poi,
+                $download['effective_url'] ?: $url,
+                $image['extension']
+            );
+
+            $file = new SystemFile;
+            $file->is_public = true;
+            $file->fromFile($tempPath, $filename);
+            $poi->image()->add($file);
+
+            return [
+                'ok' => true,
+                'path' => $file->getPath(),
+            ];
+        } finally {
+            if (is_file($tempPath)) {
+                @unlink($tempPath);
+            }
+        }
+    }
+
+    protected function downloadImageUrl($url)
+    {
+        if (function_exists('curl_init')) {
+            return $this->downloadImageUrlWithCurl($url);
+        }
+
+        return $this->downloadImageUrlWithStreams($url);
+    }
+
+    protected function downloadImageUrlWithCurl($url)
+    {
+        $tempPath = temp_path('poi-image-' . uniqid('', true) . '.download');
+        $handle = fopen($tempPath, 'w+b');
+        if (!$handle) {
+            return ['ok' => false, 'reason' => 'cannot create temp file'];
+        }
+
+        $maxBytes = $this->imageDownloadMaxBytes();
+        $ch = curl_init($url);
+
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $handle,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 45,
+            CURLOPT_FAILONERROR => false,
+            CURLOPT_USERAGENT => 'LiveMuseum POI image sync/1.0',
+            CURLOPT_NOPROGRESS => false,
+            CURLOPT_PROGRESSFUNCTION => function ($resource, $downloadSize, $downloaded) use ($maxBytes) {
+                return $downloaded > $maxBytes ? 1 : 0;
+            },
+        ]);
+
+        if (defined('CURLOPT_PROTOCOLS')) {
+            curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+        }
+        if (defined('CURLOPT_REDIR_PROTOCOLS')) {
+            curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+        }
+
+        $ok = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $effectiveUrl = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+
+        curl_close($ch);
+        fclose($handle);
+
+        if (!$ok || $errno) {
+            @unlink($tempPath);
+            $reason = $errno === CURLE_ABORTED_BY_CALLBACK ? 'image exceeds max size' : trim($error);
+            return ['ok' => false, 'reason' => $reason ?: 'download failed'];
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            @unlink($tempPath);
+            return ['ok' => false, 'reason' => 'HTTP ' . $httpCode];
+        }
+
+        clearstatcache(true, $tempPath);
+        $size = is_file($tempPath) ? filesize($tempPath) : 0;
+        if ($size <= 0) {
+            @unlink($tempPath);
+            return ['ok' => false, 'reason' => 'empty response'];
+        }
+
+        if ($size > $maxBytes) {
+            @unlink($tempPath);
+            return ['ok' => false, 'reason' => 'image exceeds max size'];
+        }
+
+        return [
+            'ok' => true,
+            'path' => $tempPath,
+            'content_type' => $contentType,
+            'effective_url' => $effectiveUrl,
+        ];
+    }
+
+    protected function downloadImageUrlWithStreams($url)
+    {
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 45,
+                'follow_location' => 1,
+                'max_redirects' => 5,
+                'ignore_errors' => true,
+                'header' => "User-Agent: LiveMuseum POI image sync/1.0\r\n",
+            ],
+        ]);
+
+        $remote = @fopen($url, 'rb', false, $context);
+        if (!$remote) {
+            return ['ok' => false, 'reason' => 'download failed'];
+        }
+
+        $tempPath = temp_path('poi-image-' . uniqid('', true) . '.download');
+        $local = fopen($tempPath, 'w+b');
+        if (!$local) {
+            fclose($remote);
+            return ['ok' => false, 'reason' => 'cannot create temp file'];
+        }
+
+        $maxBytes = $this->imageDownloadMaxBytes();
+        $bytes = 0;
+        while (!feof($remote)) {
+            $chunk = fread($remote, 8192);
+            if ($chunk === false) {
+                fclose($remote);
+                fclose($local);
+                @unlink($tempPath);
+                return ['ok' => false, 'reason' => 'download failed'];
+            }
+
+            $bytes += strlen($chunk);
+            if ($bytes > $maxBytes) {
+                fclose($remote);
+                fclose($local);
+                @unlink($tempPath);
+                return ['ok' => false, 'reason' => 'image exceeds max size'];
+            }
+
+            fwrite($local, $chunk);
+        }
+
+        $meta = stream_get_meta_data($remote);
+        fclose($remote);
+        fclose($local);
+
+        $headers = $meta['wrapper_data'] ?? [];
+        $status = $this->httpStatusFromHeaders($headers);
+        if ($status < 200 || $status >= 300) {
+            @unlink($tempPath);
+            return ['ok' => false, 'reason' => 'HTTP ' . $status];
+        }
+
+        if ($bytes <= 0) {
+            @unlink($tempPath);
+            return ['ok' => false, 'reason' => 'empty response'];
+        }
+
+        return [
+            'ok' => true,
+            'path' => $tempPath,
+            'content_type' => $this->httpHeaderValue($headers, 'content-type'),
+            'effective_url' => $url,
+        ];
+    }
+
+    protected function downloadedImageInfo($path, $contentType = null)
+    {
+        $info = @getimagesize($path);
+        if (!$info || empty($info['mime'])) {
+            return ['ok' => false, 'reason' => 'not an image'];
+        }
+
+        $mime = $this->normalizeContentType($info['mime'] ?: $contentType);
+        $extension = $this->imageExtensionForMime($mime);
+        if (!$extension) {
+            return ['ok' => false, 'reason' => 'unsupported image type ' . $mime];
+        }
+
+        return [
+            'ok' => true,
+            'mime' => $mime,
+            'extension' => $extension,
+        ];
+    }
+
+    protected function imageExtensionForMime($mime)
+    {
+        $map = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'image/avif' => 'avif',
+        ];
+
+        return $map[$this->normalizeContentType($mime)] ?? null;
+    }
+
+    protected function poiImageFilename(Poi $poi, $url, $extension)
+    {
+        $path = parse_url((string) $url, PHP_URL_PATH);
+        $basename = $path ? rawurldecode(basename($path)) : '';
+        $name = pathinfo($basename, PATHINFO_FILENAME);
+
+        if (!$name || strtolower($name) === 'filepath') {
+            $name = $poi->title ?: 'poi-' . $poi->id;
+        }
+
+        $slug = Str::slug($name) ?: 'poi-' . $poi->id;
+
+        return substr($slug, 0, 180) . '.' . $extension;
+    }
+
+    protected function imageDownloadMaxBytes()
+    {
+        $maxMb = (int) env('POI_IMAGE_DOWNLOAD_MAX_MB', env('PICTURE_UPLOAD_MAX_MB', 10));
+
+        return max(1, $maxMb) * 1024 * 1024;
+    }
+
+    protected function normalizeContentType($contentType)
+    {
+        return strtolower(trim(explode(';', (string) $contentType)[0]));
+    }
+
+    protected function httpStatusFromHeaders(array $headers)
+    {
+        $status = 0;
+        foreach ($headers as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d+)/i', (string) $header, $matches)) {
+                $status = (int) $matches[1];
+            }
+        }
+
+        return $status ?: 200;
+    }
+
+    protected function httpHeaderValue(array $headers, $name)
+    {
+        $name = strtolower($name);
+        $value = null;
+
+        foreach ($headers as $header) {
+            $parts = explode(':', (string) $header, 2);
+            if (count($parts) === 2 && strtolower(trim($parts[0])) === $name) {
+                $value = trim($parts[1]);
+            }
+        }
+
+        return $value;
+    }
+
+    protected function writeImageSyncSkip($poiId, $reason)
+    {
+        if (!$this->isImageSyncVerbose()) {
+            return;
+        }
+
+        $this->output->writeln(sprintf('  skipped #%d: %s', $poiId, $reason));
+    }
+
+    protected function isImageSyncVerbose()
+    {
+        return method_exists($this->output, 'isVerbose') && $this->output->isVerbose();
     }
 
     protected function sourceName(array $record, $relativeFile)
