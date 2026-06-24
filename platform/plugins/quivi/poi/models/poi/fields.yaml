@@ -48,6 +48,13 @@ tabs:
             label: CAP
             tab: Localizzazione
             span: left
+        _geo_picker:
+            label: ''
+            tab: Localizzazione
+            span: full
+            type: partial
+            path: $/quivi/poi/models/poi/_geo_picker.htm
+
         lat:
             label: Latitudine
             tab: Localizzazione

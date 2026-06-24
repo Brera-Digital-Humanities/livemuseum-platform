@@ -1,0 +1,133 @@
+<?php
+use Quivi\Poi\Models\PoiSetting;
+
+$lat = $model->lat ?? null;
+$lng = $model->lng ?? null;
+
+$googleMapsApiKey = trim((string) PoiSetting::get('google_maps_api_key'));
+$hasGoogleMapsApiKey = $googleMapsApiKey !== '';
+$mapId    = 'poi-geo-map-'    . uniqid();
+$searchId = 'poi-geo-search-' . uniqid();
+?>
+
+<div class="poi-geo-picker" data-map-id="<?= e($mapId) ?>" data-search-id="<?= e($searchId) ?>">
+    <div class="callout callout-info">
+        <div class="header">
+            <i class="icon-map-marker"></i>
+            <h3>Coordinate</h3>
+            <p>
+                <?php if ($hasGoogleMapsApiKey): ?>
+                    Usa la mappa per posizionare il POI. Clicca sulla mappa o trascina il marker per aggiornare le coordinate.
+                <?php else: ?>
+                    La Google Maps API Key non è configurata. Inserisci latitudine e longitudine manualmente nei campi qui sotto.
+                <?php endif ?>
+            </p>
+        </div>
+    </div>
+
+    <?php if ($hasGoogleMapsApiKey): ?>
+        <div class="form-group">
+            <label for="<?= e($searchId) ?>">Cerca indirizzo</label>
+            <input id="<?= e($searchId) ?>" class="form-control" type="text" placeholder="Cerca un indirizzo o sposta il marker sulla mappa">
+        </div>
+        <div id="<?= e($mapId) ?>" style="height: 400px; width: 100%; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 16px;"></div>
+    <?php endif ?>
+</div>
+
+<?php if ($hasGoogleMapsApiKey): ?>
+<script>
+(function() {
+    var apiKey      = <?= json_encode($googleMapsApiKey) ?>;
+    var mapId       = <?= json_encode($mapId) ?>;
+    var searchId    = <?= json_encode($searchId) ?>;
+    var initialLat  = <?= json_encode(is_numeric($lat) ? (float) $lat : 41.9028) ?>;
+    var initialLng  = <?= json_encode(is_numeric($lng) ? (float) $lng : 12.4964) ?>;
+    var hasInitialPoint = <?= json_encode(is_numeric($lat) && is_numeric($lng)) ?>;
+
+    function getLatInput() { return document.querySelector('input[name="Poi[lat]"]'); }
+    function getLngInput() { return document.querySelector('input[name="Poi[lng]"]'); }
+
+    function setCoords(lat, lng) {
+        var latInput = getLatInput();
+        var lngInput = getLngInput();
+        if (latInput) { latInput.value = lat; latInput.dispatchEvent(new Event('change', { bubbles: true })); }
+        if (lngInput) { lngInput.value = lng; lngInput.dispatchEvent(new Event('change', { bubbles: true })); }
+    }
+
+    function hideManualFields() {
+        [getLatInput(), getLngInput()].forEach(function(input) {
+            var group = input && input.closest('.form-group');
+            if (group) group.style.display = 'none';
+        });
+    }
+
+    function initMap() {
+        var mapElement    = document.getElementById(mapId);
+        var searchElement = document.getElementById(searchId);
+        if (!mapElement || !window.google || !window.google.maps) return;
+
+        hideManualFields();
+
+        var center = { lat: initialLat, lng: initialLng };
+        var map = new google.maps.Map(mapElement, {
+            center: center,
+            zoom: hasInitialPoint ? 15 : 6,
+            mapTypeControl: false,
+            streetViewControl: false,
+        });
+        var marker = new google.maps.Marker({
+            map: map,
+            position: center,
+            draggable: true,
+            visible: hasInitialPoint,
+        });
+
+        function updateFromLatLng(latLng) {
+            marker.setPosition(latLng);
+            marker.setVisible(true);
+            map.panTo(latLng);
+            setCoords(latLng.lat().toFixed(7), latLng.lng().toFixed(7));
+        }
+
+        map.addListener('click', function(event) { updateFromLatLng(event.latLng); });
+        marker.addListener('dragend', function(event) { updateFromLatLng(event.latLng); });
+
+        if (searchElement && google.maps.places) {
+            var autocomplete = new google.maps.places.Autocomplete(searchElement);
+            autocomplete.bindTo('bounds', map);
+            autocomplete.addListener('place_changed', function() {
+                var place = autocomplete.getPlace();
+                if (!place.geometry || !place.geometry.location) return;
+                if (place.geometry.viewport) {
+                    map.fitBounds(place.geometry.viewport);
+                } else {
+                    map.setCenter(place.geometry.location);
+                    map.setZoom(15);
+                }
+                updateFromLatLng(place.geometry.location);
+            });
+        }
+    }
+
+    if (!window.quiviPoiGoogleMapsCallbacks) {
+        window.quiviPoiGoogleMapsCallbacks = [];
+    }
+    window.quiviPoiGoogleMapsCallbacks.push(initMap);
+
+    window.quiviPoiInitGoogleMaps = function() {
+        window.quiviPoiGoogleMapsCallbacks.forEach(function(cb) { cb(); });
+    };
+
+    if (window.google && window.google.maps) {
+        initMap();
+    } else if (!document.querySelector('script[data-quivi-poi-google-maps]')) {
+        var script = document.createElement('script');
+        script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(apiKey) + '&libraries=places&callback=quiviPoiInitGoogleMaps';
+        script.async = true;
+        script.defer = true;
+        script.setAttribute('data-quivi-poi-google-maps', '1');
+        document.head.appendChild(script);
+    }
+})();
+</script>
+<?php endif ?>

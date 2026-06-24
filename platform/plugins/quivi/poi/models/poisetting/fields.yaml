@@ -1,0 +1,7 @@
+fields:
+    google_maps_api_key:
+        label: Google Maps API Key
+        commentAbove: Se configurata, il form di modifica POI mostra una mappa interattiva per spostare il marker e aggiornare le coordinate. Senza chiave restano disponibili i campi latitudine e longitudine manuali.
+        span: full
+        type: sensitive
+        allowCopy: false

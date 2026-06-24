@@ -11,6 +11,17 @@ class Plugin extends PluginBase
 
     public function registerSettings()
     {
+        return [
+            'settings' => [
+                'label'       => 'LiveMuseum POI',
+                'description' => 'Impostazioni generali del plugin LiveMuseum (Google Maps API Key, ecc.)',
+                'icon'        => 'icon-map-marker',
+                'class'       => 'Quivi\Poi\Models\PoiSetting',
+                'order'       => 200,
+                'keywords'    => 'livemuseum poi google maps api key coordinate',
+                'permissions' => ['quivi.poi.pois'],
+            ],
+        ];
     }
 
     public function register()
