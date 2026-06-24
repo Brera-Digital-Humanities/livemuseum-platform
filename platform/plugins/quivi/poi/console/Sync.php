@@ -151,15 +151,15 @@ class Sync extends Command
                     continue;
                 }
 
-                $url = $this->cleanImageSourceUrl($row->image_url);
-                if (!$this->isDownloadableImageUrl($url)) {
+                $urls = $this->poiImageSyncCandidateUrls($row->image_url, $poi->raw_data ?? null);
+                if (!$urls) {
                     $stats['skipped']++;
                     $this->writeImageSyncSkip($row->id, 'invalid URL');
                     continue;
                 }
 
                 try {
-                    $result = $this->downloadAndAttachPoiImage($poi, $url);
+                    $result = $this->downloadAndAttachFirstPoiImage($poi, $urls);
                 } catch (Throwable $e) {
                     $stats['failed']++;
                     $this->writeImageSyncSkip($row->id, $e->getMessage());
@@ -721,10 +721,104 @@ class Sync extends Command
         }
 
         if (strpos($url, '//') === 0) {
-            return 'https:' . $url;
+            $url = 'https:' . $url;
         }
 
+        $url = $this->commonsImageDownloadUrl($url);
+
         return $url;
+    }
+
+    protected function poiImageSyncCandidateUrls($primaryUrl, $rawData = null)
+    {
+        $urls = [];
+        $this->appendImageSyncCandidateUrl($urls, $primaryUrl);
+
+        foreach ($this->rawDataImageUrls($rawData) as $url) {
+            $this->appendImageSyncCandidateUrl($urls, $url);
+        }
+
+        return $urls;
+    }
+
+    protected function appendImageSyncCandidateUrl(array &$urls, $url)
+    {
+        $url = $this->cleanImageSourceUrl($url);
+        if (!$this->isDownloadableImageUrl($url) || in_array($url, $urls, true)) {
+            return;
+        }
+
+        $urls[] = $url;
+    }
+
+    protected function rawDataImageUrls($rawData)
+    {
+        if (!$rawData) {
+            return [];
+        }
+
+        if (is_string($rawData)) {
+            $rawData = json_decode($rawData, true);
+        }
+
+        if (!is_array($rawData)) {
+            return [];
+        }
+
+        $urls = [
+            $rawData['immagine'] ?? null,
+            $rawData['immagine_commons'] ?? null,
+        ];
+
+        foreach (['immagini', 'immagini_iiif'] as $field) {
+            if (empty($rawData[$field]) || !is_array($rawData[$field])) {
+                continue;
+            }
+
+            foreach ($rawData[$field] as $item) {
+                if (is_string($item)) {
+                    $urls[] = $item;
+                    continue;
+                }
+
+                if (is_array($item)) {
+                    $urls[] = $item['url'] ?? $item['src'] ?? $item['image'] ?? $item['immagine'] ?? null;
+                }
+            }
+        }
+
+        return $urls;
+    }
+
+    protected function commonsImageDownloadUrl($url)
+    {
+        $parts = parse_url($url);
+        $host = strtolower($parts['host'] ?? '');
+        $path = $parts['path'] ?? '';
+
+        if ($host !== 'commons.wikimedia.org' || strpos($path, '/wiki/Special:FilePath/') === false) {
+            return $url;
+        }
+
+        $query = [];
+        if (!empty($parts['query'])) {
+            parse_str($parts['query'], $query);
+        }
+
+        if (empty($query['width'])) {
+            $query['width'] = (string) $this->commonsImageWidth();
+        }
+
+        $rebuilt = ($parts['scheme'] ?? 'https') . '://' . $parts['host'] . $path;
+        $queryString = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        if ($queryString !== '') {
+            $rebuilt .= '?' . $queryString;
+        }
+        if (!empty($parts['fragment'])) {
+            $rebuilt .= '#' . $parts['fragment'];
+        }
+
+        return $rebuilt;
     }
 
     protected function isDownloadableImageUrl($url)
@@ -774,6 +868,25 @@ class Sync extends Command
                 @unlink($tempPath);
             }
         }
+    }
+
+    protected function downloadAndAttachFirstPoiImage(Poi $poi, array $urls)
+    {
+        $reasons = [];
+
+        foreach ($urls as $url) {
+            $result = $this->downloadAndAttachPoiImage($poi, $url);
+            if ($result['ok']) {
+                return $result;
+            }
+
+            $reasons[] = $this->shortImageSyncUrl($url) . ': ' . ($result['reason'] ?? 'download failed');
+        }
+
+        return [
+            'ok' => false,
+            'reason' => implode('; ', array_slice($reasons, 0, 3)) . (count($reasons) > 3 ? '; ...' : ''),
+        ];
     }
 
     protected function downloadImageUrl($url)
@@ -983,6 +1096,11 @@ class Sync extends Command
         return max(1, $maxMb) * 1024 * 1024;
     }
 
+    protected function commonsImageWidth()
+    {
+        return max(320, (int) env('POI_COMMONS_IMAGE_WIDTH', 1600));
+    }
+
     protected function normalizeContentType($contentType)
     {
         return strtolower(trim(explode(';', (string) $contentType)[0]));
@@ -1027,6 +1145,13 @@ class Sync extends Command
     protected function isImageSyncVerbose()
     {
         return method_exists($this->output, 'isVerbose') && $this->output->isVerbose();
+    }
+
+    protected function shortImageSyncUrl($url)
+    {
+        $url = (string) $url;
+
+        return strlen($url) > 120 ? substr($url, 0, 117) . '...' : $url;
     }
 
     protected function sourceName(array $record, $relativeFile)
