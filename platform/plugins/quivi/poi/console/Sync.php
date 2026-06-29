@@ -744,6 +744,23 @@ class Sync extends Command
     protected function appendImageSyncCandidateUrl(array &$urls, $url)
     {
         $url = $this->cleanImageSourceUrl($url);
+        if (!$this->isDownloadableImageUrl($url)) {
+            return;
+        }
+
+        if ($this->isCommonsSpecialFilePathUrl($url)) {
+            foreach ($this->commonsImageWidths() as $width) {
+                $this->appendUniqueImageSyncUrl($urls, $this->commonsImageDownloadUrl($url, $width));
+            }
+
+            return;
+        }
+
+        $this->appendUniqueImageSyncUrl($urls, $url);
+    }
+
+    protected function appendUniqueImageSyncUrl(array &$urls, $url)
+    {
         if (!$this->isDownloadableImageUrl($url) || in_array($url, $urls, true)) {
             return;
         }
@@ -790,13 +807,19 @@ class Sync extends Command
         return $urls;
     }
 
-    protected function commonsImageDownloadUrl($url)
+    protected function isCommonsSpecialFilePathUrl($url)
     {
         $parts = parse_url($url);
         $host = strtolower($parts['host'] ?? '');
         $path = $parts['path'] ?? '';
 
-        if ($host !== 'commons.wikimedia.org' || strpos($path, '/wiki/Special:FilePath/') === false) {
+        return $host === 'commons.wikimedia.org' && strpos($path, '/wiki/Special:FilePath/') !== false;
+    }
+
+    protected function commonsImageDownloadUrl($url, $width = null)
+    {
+        $parts = parse_url($url);
+        if (!$this->isCommonsSpecialFilePathUrl($url)) {
             return $url;
         }
 
@@ -805,8 +828,8 @@ class Sync extends Command
             parse_str($parts['query'], $query);
         }
 
-        if (empty($query['width'])) {
-            $query['width'] = (string) $this->commonsImageWidth();
+        if ($width !== null || empty($query['width'])) {
+            $query['width'] = (string) ($width ?: $this->commonsImageWidth());
         }
 
         $rebuilt = ($parts['scheme'] ?? 'https') . '://' . $parts['host'] . $path;
@@ -848,6 +871,18 @@ class Sync extends Command
                 return $image;
             }
 
+            $prepared = $this->prepareDownloadedImageForAttach($tempPath, $image);
+            if (!$prepared['ok']) {
+                return $prepared;
+            }
+
+            if ($prepared['changed']) {
+                $image = $this->downloadedImageInfo($tempPath, null);
+                if (!$image['ok']) {
+                    return $image;
+                }
+            }
+
             $filename = $this->poiImageFilename(
                 $poi,
                 $download['effective_url'] ?: $url,
@@ -880,6 +915,10 @@ class Sync extends Command
                 return $result;
             }
 
+            if (($result['reason'] ?? null) === 'HTTP 429') {
+                return $result;
+            }
+
             $reasons[] = $this->shortImageSyncUrl($url) . ': ' . ($result['reason'] ?? 'download failed');
         }
 
@@ -891,11 +930,23 @@ class Sync extends Command
 
     protected function downloadImageUrl($url)
     {
-        if (function_exists('curl_init')) {
-            return $this->downloadImageUrlWithCurl($url);
+        $attempts = max(1, $this->imageHttp429Retries() + 1);
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            $this->throttleImageDownloadUrl($url);
+
+            $result = function_exists('curl_init')
+                ? $this->downloadImageUrlWithCurl($url)
+                : $this->downloadImageUrlWithStreams($url);
+
+            if (($result['ok'] ?? false) || ($result['reason'] ?? null) !== 'HTTP 429' || $attempt >= $attempts) {
+                return $result;
+            }
+
+            sleep($this->imageHttp429SleepSeconds());
         }
 
-        return $this->downloadImageUrlWithStreams($url);
+        return ['ok' => false, 'reason' => 'download failed'];
     }
 
     protected function downloadImageUrlWithCurl($url)
@@ -906,7 +957,7 @@ class Sync extends Command
             return ['ok' => false, 'reason' => 'cannot create temp file'];
         }
 
-        $maxBytes = $this->imageDownloadMaxBytes();
+        $maxBytes = $this->imageSourceDownloadMaxBytes();
         $ch = curl_init($url);
 
         curl_setopt_array($ch, [
@@ -995,7 +1046,7 @@ class Sync extends Command
             return ['ok' => false, 'reason' => 'cannot create temp file'];
         }
 
-        $maxBytes = $this->imageDownloadMaxBytes();
+        $maxBytes = $this->imageSourceDownloadMaxBytes();
         $bytes = 0;
         while (!feof($remote)) {
             $chunk = fread($remote, 8192);
@@ -1041,6 +1092,196 @@ class Sync extends Command
         ];
     }
 
+    protected function prepareDownloadedImageForAttach($path, array $image)
+    {
+        $maxBytes = $this->imageDownloadMaxBytes();
+        clearstatcache(true, $path);
+        $size = is_file($path) ? filesize($path) : 0;
+        $needsResize = $size > $maxBytes;
+        $needsConversion = !empty($image['requires_conversion']);
+
+        if (!$needsResize && !$needsConversion) {
+            return ['ok' => true, 'changed' => false];
+        }
+
+        if (!$this->canResizeDownloadedImageMime($image['mime'])) {
+            return [
+                'ok' => false,
+                'reason' => $needsResize ? 'image exceeds max size' : 'unsupported image type ' . $image['mime'],
+            ];
+        }
+
+        if (class_exists('\Imagick')) {
+            $result = $this->resizeDownloadedImageWithImagick($path, $maxBytes);
+            if ($result['ok']) {
+                return $result;
+            }
+        }
+
+        $result = $this->resizeDownloadedImageWithGd($path, $image['mime'], $maxBytes);
+        if ($result['ok']) {
+            return $result;
+        }
+
+        return [
+            'ok' => false,
+            'reason' => $needsResize ? 'image exceeds max size after resize' : 'unsupported image type ' . $image['mime'],
+        ];
+    }
+
+    protected function resizeDownloadedImageWithImagick($path, $maxBytes)
+    {
+        try {
+            $source = new \Imagick($path);
+            if ($source->getNumberImages() > 1) {
+                $source->setIteratorIndex(0);
+            }
+            $source = $source->getImage();
+            if (method_exists($source, 'autoOrient')) {
+                $source->autoOrient();
+            }
+
+            $width = max(1, $source->getImageWidth());
+            $height = max(1, $source->getImageHeight());
+            $baseDimension = min(max($width, $height), $this->imageResizeMaxDimension());
+            $quality = $this->imageResizeQuality();
+            $minDimension = $this->imageResizeMinDimension();
+            $resizedPath = temp_path('poi-image-resized-' . uniqid('', true) . '.jpg');
+
+            for ($attempt = 0; $attempt < 8; $attempt++) {
+                $targetDimension = max($minDimension, (int) round($baseDimension * pow(0.82, $attempt)));
+                $targetQuality = max($this->imageResizeMinQuality(), $quality - ($attempt * 4));
+                $image = clone $source;
+
+                if (max($width, $height) > $targetDimension) {
+                    if ($width >= $height) {
+                        $targetWidth = $targetDimension;
+                        $targetHeight = max(1, (int) round($height * ($targetDimension / $width)));
+                    } else {
+                        $targetHeight = $targetDimension;
+                        $targetWidth = max(1, (int) round($width * ($targetDimension / $height)));
+                    }
+                    $image->thumbnailImage($targetWidth, $targetHeight, true);
+                }
+
+                $image->setImageBackgroundColor('white');
+                if (method_exists($image, 'setImageAlphaChannel') && defined('\Imagick::ALPHACHANNEL_REMOVE')) {
+                    $image->setImageAlphaChannel(\Imagick::ALPHACHANNEL_REMOVE);
+                }
+                $image->setImageFormat('jpeg');
+                $image->setImageCompressionQuality($targetQuality);
+                $image->writeImage($resizedPath);
+                $image->clear();
+                $image->destroy();
+
+                clearstatcache(true, $resizedPath);
+                if (is_file($resizedPath) && filesize($resizedPath) > 0 && filesize($resizedPath) <= $maxBytes) {
+                    $source->clear();
+                    $source->destroy();
+                    return $this->replaceDownloadedImage($path, $resizedPath);
+                }
+            }
+
+            if (is_file($resizedPath)) {
+                @unlink($resizedPath);
+            }
+            $source->clear();
+            $source->destroy();
+        } catch (Throwable $e) {
+            if (isset($resizedPath) && is_file($resizedPath)) {
+                @unlink($resizedPath);
+            }
+        }
+
+        return ['ok' => false, 'changed' => false];
+    }
+
+    protected function resizeDownloadedImageWithGd($path, $mime, $maxBytes)
+    {
+        $source = $this->createGdImageFromFile($path, $mime);
+        if (!$source) {
+            return ['ok' => false, 'changed' => false];
+        }
+
+        $width = imagesx($source);
+        $height = imagesy($source);
+        if ($width <= 0 || $height <= 0) {
+            imagedestroy($source);
+            return ['ok' => false, 'changed' => false];
+        }
+
+        $baseDimension = min(max($width, $height), $this->imageResizeMaxDimension());
+        $quality = $this->imageResizeQuality();
+        $minDimension = $this->imageResizeMinDimension();
+        $resizedPath = temp_path('poi-image-resized-' . uniqid('', true) . '.jpg');
+
+        for ($attempt = 0; $attempt < 8; $attempt++) {
+            $targetDimension = max($minDimension, (int) round($baseDimension * pow(0.82, $attempt)));
+            $scale = min(1, $targetDimension / max($width, $height));
+            $targetWidth = max(1, (int) round($width * $scale));
+            $targetHeight = max(1, (int) round($height * $scale));
+            $targetQuality = max($this->imageResizeMinQuality(), $quality - ($attempt * 4));
+
+            $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+            if (!$canvas) {
+                continue;
+            }
+
+            $white = imagecolorallocate($canvas, 255, 255, 255);
+            imagefill($canvas, 0, 0, $white);
+            imagecopyresampled($canvas, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $width, $height);
+            imagejpeg($canvas, $resizedPath, $targetQuality);
+            imagedestroy($canvas);
+
+            clearstatcache(true, $resizedPath);
+            if (is_file($resizedPath) && filesize($resizedPath) > 0 && filesize($resizedPath) <= $maxBytes) {
+                imagedestroy($source);
+                return $this->replaceDownloadedImage($path, $resizedPath);
+            }
+        }
+
+        imagedestroy($source);
+        if (is_file($resizedPath)) {
+            @unlink($resizedPath);
+        }
+
+        return ['ok' => false, 'changed' => false];
+    }
+
+    protected function createGdImageFromFile($path, $mime)
+    {
+        switch ($this->normalizeContentType($mime)) {
+            case 'image/jpeg':
+                return function_exists('imagecreatefromjpeg') ? @imagecreatefromjpeg($path) : null;
+            case 'image/png':
+                return function_exists('imagecreatefrompng') ? @imagecreatefrompng($path) : null;
+            case 'image/gif':
+                return function_exists('imagecreatefromgif') ? @imagecreatefromgif($path) : null;
+            case 'image/webp':
+                return function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : null;
+            case 'image/avif':
+                return function_exists('imagecreatefromavif') ? @imagecreatefromavif($path) : null;
+        }
+
+        return null;
+    }
+
+    protected function replaceDownloadedImage($path, $replacementPath)
+    {
+        if (@rename($replacementPath, $path)) {
+            return ['ok' => true, 'changed' => true];
+        }
+
+        if (@copy($replacementPath, $path)) {
+            @unlink($replacementPath);
+            return ['ok' => true, 'changed' => true];
+        }
+
+        @unlink($replacementPath);
+
+        return ['ok' => false, 'changed' => false];
+    }
+
     protected function downloadedImageInfo($path, $contentType = null)
     {
         $info = @getimagesize($path);
@@ -1051,14 +1292,48 @@ class Sync extends Command
         $mime = $this->normalizeContentType($info['mime'] ?: $contentType);
         $extension = $this->imageExtensionForMime($mime);
         if (!$extension) {
-            return ['ok' => false, 'reason' => 'unsupported image type ' . $mime];
+            if (!$this->canResizeDownloadedImageMime($mime)) {
+                return ['ok' => false, 'reason' => 'unsupported image type ' . $mime];
+            }
+
+            $extension = 'jpg';
         }
 
         return [
             'ok' => true,
             'mime' => $mime,
             'extension' => $extension,
+            'requires_conversion' => !$this->imageExtensionForMime($mime),
         ];
+    }
+
+    protected function canResizeDownloadedImageMime($mime)
+    {
+        $mime = $this->normalizeContentType($mime);
+
+        if (class_exists('\Imagick')) {
+            return in_array($mime, [
+                'image/jpeg',
+                'image/png',
+                'image/gif',
+                'image/webp',
+                'image/avif',
+                'image/tiff',
+                'image/x-tiff',
+                'image/bmp',
+                'image/x-ms-bmp',
+            ], true);
+        }
+
+        $gdMap = [
+            'image/jpeg' => 'imagecreatefromjpeg',
+            'image/png' => 'imagecreatefrompng',
+            'image/gif' => 'imagecreatefromgif',
+            'image/webp' => 'imagecreatefromwebp',
+            'image/avif' => 'imagecreatefromavif',
+        ];
+
+        return isset($gdMap[$mime]) && function_exists($gdMap[$mime]);
     }
 
     protected function imageExtensionForMime($mime)
@@ -1096,9 +1371,96 @@ class Sync extends Command
         return max(1, $maxMb) * 1024 * 1024;
     }
 
+    protected function imageSourceDownloadMaxBytes()
+    {
+        $targetMb = (int) env('POI_IMAGE_DOWNLOAD_MAX_MB', env('PICTURE_UPLOAD_MAX_MB', 10));
+        $maxMb = (int) env('POI_IMAGE_SOURCE_DOWNLOAD_MAX_MB', max($targetMb, 40));
+
+        return max(1, $maxMb) * 1024 * 1024;
+    }
+
     protected function commonsImageWidth()
     {
         return max(320, (int) env('POI_COMMONS_IMAGE_WIDTH', 1600));
+    }
+
+    protected function commonsImageWidths()
+    {
+        $configured = trim((string) env('POI_COMMONS_IMAGE_WIDTHS', ''));
+        if ($configured !== '') {
+            $widths = array_map('intval', preg_split('/\s*,\s*/', $configured));
+        } else {
+            $widths = [$this->commonsImageWidth(), 1200, 900, 640];
+        }
+
+        $widths = array_values(array_unique(array_filter($widths, function ($width) {
+            return $width >= 320;
+        })));
+
+        rsort($widths, SORT_NUMERIC);
+
+        return $widths ?: [$this->commonsImageWidth()];
+    }
+
+    protected function imageResizeMaxDimension()
+    {
+        return max(640, (int) env('POI_IMAGE_RESIZE_MAX_DIMENSION', 1800));
+    }
+
+    protected function imageResizeMinDimension()
+    {
+        return max(320, (int) env('POI_IMAGE_RESIZE_MIN_DIMENSION', 640));
+    }
+
+    protected function imageResizeQuality()
+    {
+        return min(95, max(50, (int) env('POI_IMAGE_RESIZE_QUALITY', 82)));
+    }
+
+    protected function imageResizeMinQuality()
+    {
+        return min($this->imageResizeQuality(), max(40, (int) env('POI_IMAGE_RESIZE_MIN_QUALITY', 64)));
+    }
+
+    protected function imageHttp429Retries()
+    {
+        return max(0, (int) env('POI_IMAGE_HTTP_429_RETRIES', 1));
+    }
+
+    protected function imageHttp429SleepSeconds()
+    {
+        return max(1, (int) env('POI_IMAGE_HTTP_429_SLEEP_SECONDS', 2));
+    }
+
+    protected function throttleImageDownloadUrl($url)
+    {
+        $delayMs = $this->imageDownloadThrottleMs($url);
+        if ($delayMs <= 0) {
+            return;
+        }
+
+        static $lastByHost = [];
+
+        $host = strtolower(parse_url((string) $url, PHP_URL_HOST) ?: 'default');
+        $now = microtime(true);
+        if (isset($lastByHost[$host])) {
+            $elapsedMs = ($now - $lastByHost[$host]) * 1000;
+            if ($elapsedMs < $delayMs) {
+                usleep((int) (($delayMs - $elapsedMs) * 1000));
+            }
+        }
+
+        $lastByHost[$host] = microtime(true);
+    }
+
+    protected function imageDownloadThrottleMs($url)
+    {
+        $host = strtolower(parse_url((string) $url, PHP_URL_HOST) ?: '');
+        if (in_array($host, ['commons.wikimedia.org', 'upload.wikimedia.org'], true)) {
+            return max(0, (int) env('POI_COMMONS_THROTTLE_MS', 350));
+        }
+
+        return max(0, (int) env('POI_IMAGE_DOWNLOAD_THROTTLE_MS', 0));
     }
 
     protected function normalizeContentType($contentType)
