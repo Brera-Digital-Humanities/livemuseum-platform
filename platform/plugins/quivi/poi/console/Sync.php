@@ -823,6 +823,8 @@ class Sync extends Command
             return $url;
         }
 
+        $host = $parts['host'] ?? 'commons.wikimedia.org';
+        $path = $parts['path'] ?? '';
         $query = [];
         if (!empty($parts['query'])) {
             parse_str($parts['query'], $query);
@@ -832,7 +834,7 @@ class Sync extends Command
             $query['width'] = (string) ($width ?: $this->commonsImageWidth());
         }
 
-        $rebuilt = ($parts['scheme'] ?? 'https') . '://' . $parts['host'] . $path;
+        $rebuilt = ($parts['scheme'] ?? 'https') . '://' . $host . $path;
         $queryString = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
         if ($queryString !== '') {
             $rebuilt .= '?' . $queryString;
